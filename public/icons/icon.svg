@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="leaf-grad" x1="0" y1="1" x2="0.5" y2="0">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#bg-grad)"/>
+  <!-- Soil / base arc -->
+  <ellipse cx="256" cy="380" rx="100" ry="24" fill="#ffffff" opacity="0.25"/>
+  <!-- Stem -->
+  <path d="M256 380 C256 320 256 280 256 240" stroke="#ffffff" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <!-- Left leaf -->
+  <path d="M256 300 C230 280 200 260 190 230 C190 230 220 240 256 280" fill="url(#leaf-grad)" opacity="0.9"/>
+  <!-- Right leaf -->
+  <path d="M256 260 C280 240 310 225 325 200 C325 200 295 215 256 250" fill="url(#leaf-grad)" opacity="0.9"/>
+  <!-- Top sprout / new leaf unfurling -->
+  <path d="M256 240 C250 220 240 195 230 170 C240 180 256 200 256 200 C256 200 272 180 282 170 C272 195 262 220 256 240 Z" fill="#ffffff" opacity="0.95"/>
+  <!-- Small sparkle top-right -->
+  <circle cx="310" cy="150" r="6" fill="#ffffff" opacity="0.7"/>
+  <circle cx="330" cy="170" r="4" fill="#ffffff" opacity="0.5"/>
+</svg>
