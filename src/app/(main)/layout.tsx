@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, MessageCircle, ListTodo, BarChart3 } from "lucide-react";
+import { Home, MessageCircle, ListTodo, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -25,6 +25,11 @@ const navItems = [
     href: "/progress",
     label: "進捗",
     icon: BarChart3,
+  },
+  {
+    href: "/settings",
+    label: "設定",
+    icon: Settings,
   },
 ];
 
