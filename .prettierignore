@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Cache
+.cache/
+
+# Package manager
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Generated files
+*.min.js
+*.min.css
+
+# Environment
+.env*
+
+# Docs (preserve formatting)
+docs/

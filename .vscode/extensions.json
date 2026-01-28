@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+    "dsznajder.es7-react-js-snippets",
+    "bradlc.vscode-tailwindcss",
+    "tursodatabase.libsql-vscode",
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    "christian-kohler.path-intellisense",
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "formulahendry.auto-rename-tag",
+    "pkief.material-icon-theme"
+  ],
+  "unwantedRecommendations": []
+}
