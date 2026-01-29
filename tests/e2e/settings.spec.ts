@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3002";
+const BASE = process.env.BASE_URL || "http://localhost:3002";
 
 /**
  * 設定画面E2Eテスト
@@ -79,14 +79,52 @@ test.describe("設定", () => {
 
     const signUpRes = await page.request.post(
       `${BASE}/api/auth/sign-up/email`,
-      { data: { email, password, name: "削除テスト" } }
+      {
+        data: { email, password, name: "削除テスト" },
+        headers: { Origin: BASE },
+      }
     );
     expect(signUpRes.ok()).toBeTruthy();
 
     // プロフィール作成
+    const profileHeaders: Record<string, string> = { Origin: BASE };
+    if (process.env.E2E_TEST_SECRET) {
+      profileHeaders["x-e2e-secret"] = process.env.E2E_TEST_SECRET;
+    }
     await page.request.post(`${BASE}/api/auth/test-login`, {
       data: { email },
+      headers: profileHeaders,
     });
+
+    // sign-inしてセッションCookieを取得
+    const signInRes = await page.request.post(
+      `${BASE}/api/auth/sign-in/email`,
+      {
+        data: { email, password },
+        headers: { Origin: BASE },
+      }
+    );
+    expect(signInRes.ok()).toBeTruthy();
+
+    // Set-CookieヘッダーからセッションCookieを抽出してブラウザに設定
+    const setCookies = signInRes.headersArray().filter(h => h.name.toLowerCase() === "set-cookie");
+    const baseUrl = new URL(BASE);
+    for (const header of setCookies) {
+      const cookieStr = header.value;
+      const [nameValue] = cookieStr.split(";");
+      const eqIndex = nameValue.indexOf("=");
+      const cookieName = nameValue.substring(0, eqIndex);
+      const cookieValue = nameValue.substring(eqIndex + 1);
+      await page.context().addCookies([{
+        name: cookieName,
+        value: cookieValue,
+        domain: baseUrl.hostname,
+        path: "/",
+        secure: baseUrl.protocol === "https:",
+        httpOnly: true,
+        sameSite: "Lax",
+      }]);
+    }
 
     await page.goto("/settings");
     await expect(
@@ -115,6 +153,6 @@ test.describe("設定", () => {
     await deleteButton.click();
 
     // ホーム画面へリダイレクト（削除後 signOut → router.push("/")）
-    await expect(page).toHaveURL(/localhost:\d+\/$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 15000 });
   });
 });

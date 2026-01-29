@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3002";
+const BASE = process.env.BASE_URL || "http://localhost:3002";
 
 /**
  * オンボーディングE2Eテスト
@@ -17,12 +17,45 @@ test.describe("オンボーディング", () => {
     const password = "TestPassword123!";
     const name = "オンボーディングテスト";
 
-    // Better Auth でユーザー登録（セッションCookieも自動設定）
+    // Better Auth でユーザー登録
     const signUpRes = await page.request.post(
       `${BASE}/api/auth/sign-up/email`,
-      { data: { email, password, name } }
+      {
+        data: { email, password, name },
+        headers: { Origin: BASE },
+      }
     );
     expect(signUpRes.ok()).toBeTruthy();
+
+    // sign-inしてセッションCookieを取得（HTTPS環境ではCookieを手動設定）
+    const signInRes = await page.request.post(
+      `${BASE}/api/auth/sign-in/email`,
+      {
+        data: { email, password },
+        headers: { Origin: BASE },
+      }
+    );
+    expect(signInRes.ok()).toBeTruthy();
+
+    // Set-CookieヘッダーからセッションCookieを抽出してブラウザに設定
+    const setCookies = signInRes.headersArray().filter(h => h.name.toLowerCase() === "set-cookie");
+    const baseUrl = new URL(BASE);
+    for (const header of setCookies) {
+      const cookieStr = header.value;
+      const [nameValue] = cookieStr.split(";");
+      const eqIndex = nameValue.indexOf("=");
+      const cookieName = nameValue.substring(0, eqIndex);
+      const cookieValue = nameValue.substring(eqIndex + 1);
+      await page.context().addCookies([{
+        name: cookieName,
+        value: cookieValue,
+        domain: baseUrl.hostname,
+        path: "/",
+        secure: baseUrl.protocol === "https:",
+        httpOnly: true,
+        sameSite: "Lax",
+      }]);
+    }
 
     // ダッシュボードへアクセス → オンボーディング未完了なのでリダイレクト
     await page.goto("/dashboard");
