@@ -22,7 +22,12 @@ export const POST = async (request: Request) => {
   try {
     const auth = getAuth();
     const handler = toNextJsHandler(auth);
-    return handler.POST(request);
+    const response = await handler.POST(request);
+    if (response.status >= 500) {
+      const body = await response.clone().text();
+      console.error("Auth POST 5xx:", response.status, body);
+    }
+    return response;
   } catch (error) {
     console.error("Auth POST error:", error);
     return NextResponse.json(

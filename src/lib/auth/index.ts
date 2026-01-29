@@ -7,6 +7,7 @@ function createAuth() {
   const db = getDb();
 
   return betterAuth({
+    secret: process.env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db, {
       provider: "sqlite",
       schema: {
