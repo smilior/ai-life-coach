@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const baseURL = process.env.BASE_URL || "http://localhost:3002";
+const isRemote = baseURL.startsWith("https://");
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -7,7 +10,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3002",
+    baseURL,
     trace: "on-first-retry",
   },
   projects: [
@@ -23,10 +26,14 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3002",
-    reuseExistingServer: true,
-    timeout: 30000,
-  },
+  ...(isRemote
+    ? {}
+    : {
+        webServer: {
+          command: "npm run dev",
+          url: baseURL,
+          reuseExistingServer: true,
+          timeout: 30000,
+        },
+      }),
 });

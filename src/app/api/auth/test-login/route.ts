@@ -6,13 +6,17 @@ import crypto from "crypto";
 
 /**
  * テスト用プロフィール作成API
- * NODE_ENV === 'production' では無効
+ * 本番ではE2E_TEST_SECRETヘッダー必須、開発環境では制限なし
  * 認証はBetter Authの /api/auth/sign-up/email を使用し、
  * このエンドポイントはプロフィール作成のみ担当
  */
 export async function POST(request: Request) {
+  const secret = process.env.E2E_TEST_SECRET;
   if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const headerSecret = request.headers.get("x-e2e-secret");
+    if (!secret || headerSecret !== secret) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
   }
 
   const body = await request.json();

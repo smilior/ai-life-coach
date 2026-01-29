@@ -2,7 +2,7 @@ import { test as setup, expect } from "@playwright/test";
 import path from "path";
 
 const authFile = path.join(__dirname, ".auth/user.json");
-const BASE = "http://localhost:3002";
+const BASE = process.env.BASE_URL || "http://localhost:3002";
 
 setup("authenticate", async ({ page }) => {
   const timestamp = Date.now();
@@ -18,9 +18,13 @@ setup("authenticate", async ({ page }) => {
   expect(signUpRes.ok()).toBeTruthy();
 
   // オンボーディング完了プロフィールを作成
+  const headers: Record<string, string> = {};
+  if (process.env.E2E_TEST_SECRET) {
+    headers["x-e2e-secret"] = process.env.E2E_TEST_SECRET;
+  }
   const profileRes = await page.request.post(
     `${BASE}/api/auth/test-login`,
-    { data: { email } }
+    { data: { email }, headers }
   );
   expect(profileRes.ok()).toBeTruthy();
 
