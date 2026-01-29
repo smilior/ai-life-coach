@@ -10,7 +10,7 @@ setup("authenticate", async ({ page }) => {
   const password = "TestPassword123!";
   const name = "E2Eテスト";
 
-  // Better Auth でユーザー登録（セッションCookieも自動設定される）
+  // Better Auth でユーザー登録（APIリクエスト）
   const signUpRes = await page.request.post(
     `${BASE}/api/auth/sign-up/email`,
     {
@@ -31,9 +31,20 @@ setup("authenticate", async ({ page }) => {
   );
   expect(profileRes.ok()).toBeTruthy();
 
+  // ブラウザでログインページにアクセスしてサインイン
+  // (APIのsign-upではSet-CookieがSecure属性のためブラウザコンテキストに反映されない場合がある)
+  const signInRes = await page.request.post(
+    `${BASE}/api/auth/sign-in/email`,
+    {
+      data: { email, password },
+      headers: { Origin: BASE },
+    }
+  );
+  expect(signInRes.ok()).toBeTruthy();
+
   // ダッシュボードにアクセスして認証確認
   await page.goto("/dashboard");
-  await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
 
   // 認証状態を保存
   await page.context().storageState({ path: authFile });
