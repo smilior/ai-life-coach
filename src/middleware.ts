@@ -24,8 +24,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect to dashboard if accessing login page with active session
-  if (pathname === "/login" && sessionToken) {
+  // Redirect to dashboard if accessing login or home page with active session
+  if ((pathname === "/login" || pathname === "/") && sessionToken) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
