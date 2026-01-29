@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +12,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = getDb();
-    const result = await db.run(
-      new (await import("drizzle-orm")).sql`SELECT name FROM sqlite_master WHERE type='table'`
+    const result = await db.all(
+      sql`SELECT name FROM sqlite_master WHERE type='table'`
     );
     return NextResponse.json({
       dbConnected: true,
-      tables: result.rows,
+      tables: result,
       envCheck: {
         hasBetterAuthSecret: !!process.env.BETTER_AUTH_SECRET,
         hasAppUrl: !!process.env.NEXT_PUBLIC_APP_URL,
