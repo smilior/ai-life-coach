@@ -10,7 +10,7 @@ setup("authenticate", async ({ page }) => {
   const password = "TestPassword123!";
   const name = "E2Eテスト";
 
-  // Better Auth でユーザー登録（APIリクエスト）
+  // Better Auth でユーザー登録
   const signUpRes = await page.request.post(
     `${BASE}/api/auth/sign-up/email`,
     {
@@ -31,8 +31,7 @@ setup("authenticate", async ({ page }) => {
   );
   expect(profileRes.ok()).toBeTruthy();
 
-  // ブラウザでログインページにアクセスしてサインイン
-  // (APIのsign-upではSet-CookieがSecure属性のためブラウザコンテキストに反映されない場合がある)
+  // sign-inしてセッションCookieを取得
   const signInRes = await page.request.post(
     `${BASE}/api/auth/sign-in/email`,
     {
@@ -41,6 +40,26 @@ setup("authenticate", async ({ page }) => {
     }
   );
   expect(signInRes.ok()).toBeTruthy();
+
+  // Set-CookieヘッダーからセッションCookieを抽出してブラウザに設定
+  const setCookies = signInRes.headersArray().filter(h => h.name.toLowerCase() === "set-cookie");
+  const baseUrl = new URL(BASE);
+  for (const header of setCookies) {
+    const cookieStr = header.value;
+    const [nameValue] = cookieStr.split(";");
+    const eqIndex = nameValue.indexOf("=");
+    const cookieName = nameValue.substring(0, eqIndex);
+    const cookieValue = nameValue.substring(eqIndex + 1);
+    await page.context().addCookies([{
+      name: cookieName,
+      value: cookieValue,
+      domain: baseUrl.hostname,
+      path: "/",
+      secure: baseUrl.protocol === "https:",
+      httpOnly: true,
+      sameSite: "Lax",
+    }]);
+  }
 
   // ダッシュボードにアクセスして認証確認
   await page.goto("/dashboard");
