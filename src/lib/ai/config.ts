@@ -1,32 +1,30 @@
 /**
  * AI設定ファイル
- * Claude APIの設定とモデル選択
+ * OpenAI APIの設定とモデル選択
  */
 
 import type { CoachTone, SessionType } from "@/types/ai";
 
 /**
- * 利用可能なClaudeモデル
+ * 利用可能なOpenAIモデル
  */
-export const CLAUDE_MODELS = {
-  // 高性能モデル（複雑な対話向け）
-  SONNET: "claude-sonnet-4-20250514",
-  // 高速モデル（デイリーチェックイン向け）
-  HAIKU: "claude-3-5-haiku-20241022",
+export const OPENAI_MODELS = {
+  // 全セッション共通
+  GPT5_2: "gpt-5.2",
 } as const;
 
-export type ClaudeModel = (typeof CLAUDE_MODELS)[keyof typeof CLAUDE_MODELS];
+export type OpenAIModel = (typeof OPENAI_MODELS)[keyof typeof OPENAI_MODELS];
 
 /**
  * セッション種別ごとのモデル設定
  */
-export const SESSION_MODEL_CONFIG: Record<SessionType, ClaudeModel> = {
-  onboarding: CLAUDE_MODELS.SONNET, // 価値観抽出には高性能モデル
-  free: CLAUDE_MODELS.SONNET, // 自由対話には高性能モデル
-  daily_checkin: CLAUDE_MODELS.HAIKU, // 簡単なチェックインは高速モデル
-  weekly_review: CLAUDE_MODELS.SONNET, // 振り返りには高性能モデル
-  habit_review: CLAUDE_MODELS.HAIKU, // 習慣確認は高速モデル
-  celebration: CLAUDE_MODELS.HAIKU, // お祝いは高速モデル
+export const SESSION_MODEL_CONFIG: Record<SessionType, OpenAIModel> = {
+  onboarding: OPENAI_MODELS.GPT5_2,
+  free: OPENAI_MODELS.GPT5_2,
+  daily_checkin: OPENAI_MODELS.GPT5_2,
+  weekly_review: OPENAI_MODELS.GPT5_2,
+  habit_review: OPENAI_MODELS.GPT5_2,
+  celebration: OPENAI_MODELS.GPT5_2,
 };
 
 /**
@@ -77,12 +75,21 @@ export const RATE_LIMIT_CONFIG = {
 } as const;
 
 /**
+ * Reasoning effort レベル（GPT-5.2対応）
+ * none: 推論なし（高速、従来のGPT-4相当の動作）
+ * low: 軽い推論
+ * medium: 標準の推論
+ * high: 深い推論
+ */
+export type ReasoningEffort = "none" | "low" | "medium" | "high";
+
+/**
  * モデルパラメータ設定
  */
 export interface ModelParameters {
   temperature: number;
   topP: number;
-  topK: number;
+  reasoningEffort: ReasoningEffort;
 }
 
 /**
@@ -92,32 +99,32 @@ export const SESSION_PARAMETERS: Record<SessionType, ModelParameters> = {
   onboarding: {
     temperature: 0.7, // 創造的な質問生成
     topP: 0.9,
-    topK: 40,
+    reasoningEffort: "low", // 価値観抽出に軽い推論
   },
   free: {
     temperature: 0.8, // 柔軟な対話
     topP: 0.95,
-    topK: 50,
+    reasoningEffort: "none", // 自由対話は高速応答優先
   },
   daily_checkin: {
     temperature: 0.6, // 一貫した応答
     topP: 0.85,
-    topK: 30,
+    reasoningEffort: "none", // チェックインは高速応答
   },
   weekly_review: {
     temperature: 0.7,
     topP: 0.9,
-    topK: 40,
+    reasoningEffort: "low", // 振り返りに軽い推論
   },
   habit_review: {
     temperature: 0.5, // より確実な応答
     topP: 0.8,
-    topK: 25,
+    reasoningEffort: "none", // 習慣確認は高速応答
   },
   celebration: {
     temperature: 0.8, // 温かみのある応答
     topP: 0.95,
-    topK: 50,
+    reasoningEffort: "none", // お祝いは高速応答
   },
 };
 
@@ -173,17 +180,16 @@ export function getAIConfig(sessionType: SessionType, tone?: CoachTone) {
  * 環境変数からAPI設定を取得
  */
 export function getAPICredentials() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set in environment variables"
+      "OPENAI_API_KEY is not set in environment variables"
     );
   }
 
   return {
     apiKey,
-    baseUrl: process.env.ANTHROPIC_API_BASE_URL || "https://api.anthropic.com",
   };
 }
 

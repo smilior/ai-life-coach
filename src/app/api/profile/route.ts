@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 // Validation Schemas
 // ========================================
 
-const purposeEnum = z.enum(["performance", "mental", "transformation"]);
+const purposeEnum = z.enum(["performance", "mental", "transformation", "change"]);
 
 const createProfileSchema = z.object({
   nickname: z.string().min(1).max(50).optional(),
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       wakeUpTime: data.wakeUpTime ?? null,
       sleepTime: data.sleepTime ?? null,
       notificationsEnabled: true,
-      onboardingCompleted: false,
+      onboardingCompleted: true,
       createdAt: now,
       updatedAt: now,
     };
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
         data: formatProfileResponse({
           ...newProfile,
           notificationsEnabled: true,
-          onboardingCompleted: false,
+          onboardingCompleted: true,
         }),
       },
       { status: 201 }

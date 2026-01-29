@@ -24,6 +24,7 @@ export const sessions = sqliteTable("sessions", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
   expiresAt: text("expires_at").notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
@@ -42,6 +43,7 @@ export const accounts = sqliteTable("accounts", {
     .references(() => users.id, { onDelete: "cascade" }),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
+  password: text("password"),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   accessTokenExpiresAt: text("access_token_expires_at"),

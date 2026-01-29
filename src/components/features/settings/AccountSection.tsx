@@ -26,7 +26,10 @@ export function AccountSection() {
   const handleDeleteAccount = async () => {
     setIsDeletingAccount(true);
     try {
-      // TODO: Implement actual account deletion API
+      const res = await fetch("/api/account", { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error("Failed to delete account");
+      }
       await signOut();
       router.push("/");
     } catch {

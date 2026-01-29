@@ -13,16 +13,6 @@ interface WeeklyProgressProps {
   weekData?: DayProgress[];
 }
 
-const mockWeekData: DayProgress[] = [
-  { day: "月", completed: 4, total: 4 },
-  { day: "火", completed: 3, total: 4 },
-  { day: "水", completed: 4, total: 4 },
-  { day: "木", completed: 2, total: 4 },
-  { day: "金", completed: 1, total: 4 },
-  { day: "土", completed: 0, total: 4 },
-  { day: "日", completed: 0, total: 4 },
-];
-
 function getDotColor(completed: number, total: number): string {
   if (total === 0) return "bg-muted";
   const rate = completed / total;
@@ -42,7 +32,7 @@ function isToday(dayIndex: number): boolean {
 }
 
 export function WeeklyProgress({ weekData }: WeeklyProgressProps) {
-  const data = weekData ?? mockWeekData;
+  const data = weekData ?? [];
 
   const totalCompleted = data.reduce((acc, d) => acc + d.completed, 0);
   const totalTasks = data.reduce((acc, d) => acc + d.total, 0);
@@ -57,54 +47,64 @@ export function WeeklyProgress({ weekData }: WeeklyProgressProps) {
         </Badge>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-end justify-between gap-1">
-            {data.map((d, i) => {
-              const today = isToday(i);
-              const rate = d.total > 0 ? d.completed / d.total : 0;
-              return (
-                <div
-                  key={d.day}
-                  className="flex flex-1 flex-col items-center gap-2"
-                >
-                  {/* ドットまたはバー表示 */}
-                  <div className="flex flex-col items-center gap-1">
-                    {d.total > 0 ? (
-                      Array.from({ length: d.total }).map((_, dotIdx) => (
-                        <div
-                          key={dotIdx}
-                          className={`h-2.5 w-2.5 rounded-full transition-colors ${
-                            dotIdx < d.completed
-                              ? getDotColor(d.completed, d.total)
-                              : "bg-muted"
-                          }`}
-                        />
-                      ))
-                    ) : (
-                      <div className="h-2.5 w-2.5 rounded-full bg-muted" />
-                    )}
-                  </div>
-                  {/* 曜日ラベル */}
-                  <span
-                    className={`text-xs ${
-                      today
-                        ? "font-bold text-primary"
-                        : "text-muted-foreground"
-                    }`}
+      {data.length === 0 ? (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground text-center">
+              今週のデータはまだありません
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-end justify-between gap-1">
+              {data.map((d, i) => {
+                const today = isToday(i);
+                const rate = d.total > 0 ? d.completed / d.total : 0;
+                return (
+                  <div
+                    key={d.day}
+                    className="flex flex-1 flex-col items-center gap-2"
                   >
-                    {d.day}
-                  </span>
-                  {/* 達成率テキスト */}
-                  <span className="text-[10px] text-muted-foreground">
-                    {d.completed}/{d.total}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                    {/* ドットまたはバー表示 */}
+                    <div className="flex flex-col items-center gap-1">
+                      {d.total > 0 ? (
+                        Array.from({ length: d.total }).map((_, dotIdx) => (
+                          <div
+                            key={dotIdx}
+                            className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                              dotIdx < d.completed
+                                ? getDotColor(d.completed, d.total)
+                                : "bg-muted"
+                            }`}
+                          />
+                        ))
+                      ) : (
+                        <div className="h-2.5 w-2.5 rounded-full bg-muted" />
+                      )}
+                    </div>
+                    {/* 曜日ラベル */}
+                    <span
+                      className={`text-xs ${
+                        today
+                          ? "font-bold text-primary"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {d.day}
+                    </span>
+                    {/* 達成率テキスト */}
+                    <span className="text-[10px] text-muted-foreground">
+                      {d.completed}/{d.total}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </section>
   );
 }

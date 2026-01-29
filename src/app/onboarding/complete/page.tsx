@@ -42,9 +42,27 @@ export default function CompletePage() {
     };
   }, []);
 
-  const handleGoToDashboard = () => {
-    // TODO: Save onboarding data to backend
-    console.log("Onboarding completed:", data);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleGoToDashboard = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: data.purpose,
+          values: data.valueAnswers.map((va) => va.answer),
+          motivation: data.motivation,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Failed to save profile:", err);
+      }
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+    }
     router.push("/dashboard");
   };
 
@@ -127,9 +145,10 @@ export default function CompletePage() {
             onClick={handleGoToDashboard}
             size="xl"
             className="w-full"
+            disabled={isSaving}
           >
-            ダッシュボードへ
-            <ArrowRight className="ml-2 h-5 w-5" />
+            {isSaving ? "保存中..." : "ダッシュボードへ"}
+            {!isSaving && <ArrowRight className="ml-2 h-5 w-5" />}
           </Button>
 
           {/* Note */}

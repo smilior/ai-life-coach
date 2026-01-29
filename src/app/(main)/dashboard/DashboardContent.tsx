@@ -8,11 +8,15 @@ import {
   WeeklyProgress,
 } from "@/components/features/dashboard";
 
-export function DashboardContent() {
+interface DashboardContentProps {
+  userName?: string | null;
+}
+
+export function DashboardContent({ userName }: DashboardContentProps) {
   return (
     <div className="container mx-auto max-w-md space-y-6 px-4 py-6">
       {/* 1. グリーティングセクション */}
-      <Greeting nickname="ユーザー" />
+      <Greeting nickname={userName ?? "ユーザー"} />
 
       {/* 2. ストリーク表示セクション */}
       <StreakDisplay />

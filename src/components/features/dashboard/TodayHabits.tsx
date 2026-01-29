@@ -20,43 +20,12 @@ interface TodayHabitsProps {
   onToggle?: (id: string, completed: boolean) => void;
 }
 
-const mockHabits: HabitItem[] = [
-  {
-    id: "1",
-    name: "朝の瞑想",
-    twoMinVersion: "深呼吸3回",
-    completed: true,
-    streak: 12,
-  },
-  {
-    id: "2",
-    name: "読書",
-    twoMinVersion: "1ページ読む",
-    completed: false,
-    streak: 5,
-  },
-  {
-    id: "3",
-    name: "運動",
-    twoMinVersion: "ストレッチ2分",
-    completed: false,
-    streak: 3,
-  },
-  {
-    id: "4",
-    name: "日記を書く",
-    twoMinVersion: "1行だけ書く",
-    completed: false,
-    streak: 7,
-  },
-];
-
 export function TodayHabits({
   habits: initialHabits,
   onToggle,
 }: TodayHabitsProps) {
   const [habits, setHabits] = useState<HabitItem[]>(
-    initialHabits ?? mockHabits
+    initialHabits ?? []
   );
 
   const completedCount = habits.filter((h) => h.completed).length;
@@ -88,34 +57,44 @@ export function TodayHabits({
         </Badge>
       </div>
 
-      {/* プログレスバー */}
-      <div className="space-y-1.5">
-        <Progress value={progressPercent} className="h-2.5" />
-        <p className="text-xs text-muted-foreground text-right">
-          達成率 {Math.round(progressPercent)}%
-        </p>
-      </div>
-
-      {/* 全完了時のお祝い */}
-      {allCompleted && (
-        <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
-          <CardContent className="flex items-center gap-3 p-4">
-            <PartyPopper className="h-6 w-6 text-green-600 dark:text-green-400" />
-            <div>
-              <p className="font-semibold text-green-700 dark:text-green-300">
-                素晴らしい! 今日の習慣をすべて達成しました!
-              </p>
-              <p className="text-sm text-green-600/80 dark:text-green-400/80">
-                この調子で明日も頑張りましょう
-              </p>
-            </div>
+      {habits.length === 0 ? (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground text-center">
+              習慣がまだ登録されていません。コーチングで習慣を設定しましょう。
+            </p>
           </CardContent>
         </Card>
-      )}
+      ) : (
+        <>
+          {/* プログレスバー */}
+          <div className="space-y-1.5">
+            <Progress value={progressPercent} className="h-2.5" />
+            <p className="text-xs text-muted-foreground text-right">
+              達成率 {Math.round(progressPercent)}%
+            </p>
+          </div>
 
-      {/* 習慣リスト */}
-      <div className="space-y-2">
-        {habits.map((habit) => (
+          {/* 全完了時のお祝い */}
+          {allCompleted && (
+            <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
+              <CardContent className="flex items-center gap-3 p-4">
+                <PartyPopper className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <div>
+                  <p className="font-semibold text-green-700 dark:text-green-300">
+                    素晴らしい! 今日の習慣をすべて達成しました!
+                  </p>
+                  <p className="text-sm text-green-600/80 dark:text-green-400/80">
+                    この調子で明日も頑張りましょう
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 習慣リスト */}
+          <div className="space-y-2">
+            {habits.map((habit) => (
           <Card
             key={habit.id}
             className={
@@ -125,10 +104,17 @@ export function TodayHabits({
             }
           >
             <CardContent className="p-4">
-              <button
-                type="button"
-                className="flex w-full items-start gap-3 text-left"
+              <div
+                role="button"
+                tabIndex={0}
+                className="flex w-full cursor-pointer items-start gap-3 text-left"
                 onClick={() => handleToggle(habit.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleToggle(habit.id);
+                  }
+                }}
               >
                 <Checkbox
                   checked={habit.completed}
@@ -156,11 +142,13 @@ export function TodayHabits({
                     <span>{habit.streak}日</span>
                   </div>
                 )}
-              </button>
+              </div>
             </CardContent>
           </Card>
         ))}
-      </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

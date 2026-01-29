@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "@/lib/auth";
-import { getDb, coachingSessions, coachingMessages } from "@/lib/db";
+import { getDb, coachingSessions, coachingMessages, userProfiles } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
 import { nanoid } from "nanoid";
@@ -128,6 +128,23 @@ export async function POST(request: NextRequest) {
       createdAt: now,
     });
 
+    // ユーザープロフィールを取得
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.userId, session.user.id),
+    });
+
+    const userProfile = profile
+      ? {
+          nickname: profile.nickname || session.user.name || "ユーザー",
+          purpose: (profile.purpose as "performance" | "mental" | "change") || "performance",
+          values: profile.values ? JSON.parse(profile.values) : [],
+          goals: [],
+          motivation: profile.motivation || "",
+          strengths: [],
+          tone: "gentle" as const,
+        }
+      : undefined;
+
     // AI応答を生成
     const { stream, mockResponse } = await generateCoachingResponse({
       sessionId,
@@ -135,6 +152,7 @@ export async function POST(request: NextRequest) {
       currentStep,
       message,
       conversationHistory,
+      userProfile,
       userId: session.user.id,
     });
 
@@ -145,6 +163,10 @@ export async function POST(request: NextRequest) {
       totalMessages,
       coachingSession.sessionType as SessionType
     );
+
+    // セッション終了判定: ステップ9到達後、4メッセージ（2往復）ごとに完了トリガー
+    const shouldEndSession =
+      currentStep >= 9 && totalMessages > 0 && totalMessages % 4 === 0;
 
     // ステップが進んだ場合はDB更新
     if (nextStep !== currentStep) {
@@ -170,10 +192,23 @@ export async function POST(request: NextRequest) {
         createdAt: new Date().toISOString(),
       });
 
+      // セッション終了時はDBステータスを更新
+      if (shouldEndSession) {
+        await db
+          .update(coachingSessions)
+          .set({
+            status: "completed",
+            completedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(coachingSessions.id, sessionId));
+      }
+
       return NextResponse.json({
         message: mockResponse,
         step: nextStep,
         mock: true,
+        shouldEndSession,
       });
     }
 
@@ -184,6 +219,11 @@ export async function POST(request: NextRequest) {
 
       // Vercel AI SDK の toTextStreamResponse を使用
       const response = result.toTextStreamResponse();
+
+      // セッション終了時はヘッダーを付与
+      if (shouldEndSession) {
+        response.headers.set("X-Session-End", "true");
+      }
 
       // ストリーム完了後にメッセージを保存（バックグラウンド処理）
       result.text.then(async (fullText) => {
@@ -198,6 +238,18 @@ export async function POST(request: NextRequest) {
             metadata: JSON.stringify({ streamed: true }),
             createdAt: new Date().toISOString(),
           });
+
+          // セッション終了時はDBステータスを更新
+          if (shouldEndSession) {
+            await db
+              .update(coachingSessions)
+              .set({
+                status: "completed",
+                completedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(coachingSessions.id, sessionId));
+          }
         } catch (err) {
           console.error("Failed to save assistant message:", err);
         }

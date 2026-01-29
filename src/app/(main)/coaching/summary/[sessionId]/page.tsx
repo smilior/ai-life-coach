@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,31 +15,177 @@ import {
   ListChecks,
   Sparkles,
   Home,
+  Loader2,
 } from "lucide-react";
 import { SessionProgress } from "@/components/features/coaching";
+import type { CoachingStep } from "@/types/ai";
 
 /**
- * デモ用のセッションサマリーデータ
- * 実際のAPI連携時にはサーバーからフェッチする
+ * APIレスポンスのメッセージ型
  */
-const DEMO_SUMMARY = {
-  id: "session-completed-1",
-  theme: "仕事のストレス対策",
-  date: "2026年1月22日",
-  duration: "12分",
-  messageCount: 14,
-  completedSteps: 9 as const,
-  goal: "1週間前から計画的に準備を始め、締め切りのストレスを減らす",
-  currentState: "締め切り直前に焦ることが多く、ストレスを感じている",
-  strengths: ["粘り強さ", "責任感の強さ", "前向きに取り組む姿勢"],
-  actionItems: [
-    "毎朝5分、今日の優先事項を確認する",
-    "週末に翌週のスケジュールを30分かけて整理する",
-    "大きなタスクは小さなステップに分解する",
-  ],
-  coachMessage:
-    "今日のセッションでは、あなたの粘り強さと責任感の強さという素晴らしい強みが見えてきました。\n\nまずは明日の朝、5分だけ優先事項を確認することから始めてみてください。小さな一歩が、大きな変化につながります。\n\nあなたならきっとできます。応援しています！",
-};
+interface ApiMessage {
+  id: string;
+  sessionId: string;
+  role: string;
+  content: string;
+  step: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/**
+ * APIレスポンスのセッション詳細型
+ */
+interface ApiSessionDetail {
+  id: string;
+  title: string;
+  sessionType: string;
+  status: string;
+  currentStep: number;
+  context: Record<string, unknown> | null;
+  summary: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages: ApiMessage[];
+}
+
+/**
+ * サマリー表示用の型
+ */
+interface SessionSummary {
+  id: string;
+  theme: string;
+  date: string;
+  duration: string;
+  messageCount: number;
+  completedSteps: CoachingStep;
+  goal: string;
+  currentState: string;
+  strengths: string[];
+  actionItems: string[];
+  coachMessage: string;
+}
+
+/**
+ * 所要時間を計算する
+ */
+function calculateDuration(startedAt: string, completedAt: string | null): string {
+  if (!completedAt) return "--";
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  const diffMinutes = Math.round((end - start) / 60000);
+  if (diffMinutes < 1) return "1分未満";
+  return `${diffMinutes}分`;
+}
+
+/**
+ * 日付をフォーマットする
+ */
+function formatDateJa(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+/**
+ * メッセージのmetadataから情報を抽出する
+ */
+function extractFromMessages(messages: ApiMessage[]): {
+  strengths: string[];
+  actionItems: string[];
+  goal: string;
+  currentState: string;
+} {
+  const strengths: string[] = [];
+  const actionItems: string[] = [];
+  let goal = "";
+  let currentState = "";
+
+  for (const msg of messages) {
+    if (msg.metadata) {
+      if (Array.isArray(msg.metadata.strengths)) {
+        strengths.push(
+          ...(msg.metadata.strengths as string[]).filter(
+            (s) => !strengths.includes(s)
+          )
+        );
+      }
+      if (Array.isArray(msg.metadata.actionItems)) {
+        actionItems.push(
+          ...(msg.metadata.actionItems as string[]).filter(
+            (a) => !actionItems.includes(a)
+          )
+        );
+      }
+      if (typeof msg.metadata.goal === "string" && msg.metadata.goal) {
+        goal = msg.metadata.goal;
+      }
+      if (
+        typeof msg.metadata.currentState === "string" &&
+        msg.metadata.currentState
+      ) {
+        currentState = msg.metadata.currentState;
+      }
+    }
+  }
+
+  return { strengths, actionItems, goal, currentState };
+}
+
+/**
+ * コーチからの最後のメッセージを取得する
+ */
+function getLastCoachMessage(messages: ApiMessage[]): string {
+  const assistantMessages = messages.filter((m) => m.role === "assistant");
+  if (assistantMessages.length === 0) {
+    return "セッションにご参加いただきありがとうございました。引き続き目標に向けて頑張りましょう！";
+  }
+  return assistantMessages[assistantMessages.length - 1].content;
+}
+
+/**
+ * APIレスポンスをサマリーに変換
+ */
+function mapApiToSummary(apiSession: ApiSessionDetail): SessionSummary {
+  const extracted = extractFromMessages(apiSession.messages);
+
+  const completedSteps =
+    apiSession.currentStep >= 1 && apiSession.currentStep <= 9
+      ? (apiSession.currentStep as CoachingStep)
+      : (9 as CoachingStep);
+
+  return {
+    id: apiSession.id,
+    theme: apiSession.title,
+    date: formatDateJa(apiSession.startedAt),
+    duration: calculateDuration(apiSession.startedAt, apiSession.completedAt),
+    messageCount: apiSession.messages.length,
+    completedSteps,
+    goal:
+      extracted.goal ||
+      (apiSession.context?.goal as string) ||
+      "セッション内で目標を設定しました",
+    currentState:
+      extracted.currentState ||
+      (apiSession.context?.currentState as string) ||
+      "セッション内で現在地を確認しました",
+    strengths:
+      extracted.strengths.length > 0
+        ? extracted.strengths
+        : ["セッションを完了する意欲"],
+    actionItems:
+      extracted.actionItems.length > 0
+        ? extracted.actionItems
+        : ["セッションで得た気づきを振り返る"],
+    coachMessage:
+      apiSession.summary || getLastCoachMessage(apiSession.messages),
+  };
+}
 
 /**
  * セッションサマリー画面
@@ -49,10 +196,119 @@ const DEMO_SUMMARY = {
 export default function SessionSummaryPage() {
   const params = useParams();
   const router = useRouter();
-  const _sessionId = params.sessionId as string;
+  const sessionId = params.sessionId as string;
 
-  // デモデータを使用（実際にはAPIからフェッチ）
-  const summary = DEMO_SUMMARY;
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchSessionDetail() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await fetch(`/api/coaching/sessions/${sessionId}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("セッションが見つかりませんでした");
+          }
+          throw new Error("セッション情報の取得に失敗しました");
+        }
+        const json = await response.json();
+        if (json.success && json.data) {
+          setSummary(mapApiToSummary(json.data));
+        } else {
+          throw new Error("セッション情報の取得に失敗しました");
+        }
+      } catch (err) {
+        console.error("Failed to fetch session detail:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "セッション情報の取得に失敗しました"
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchSessionDetail();
+  }, [sessionId]);
+
+  // ローディング状態
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-[calc(100dvh-5rem)]">
+        <header className="border-b bg-background">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 -ml-2"
+              onClick={() => router.push("/coaching")}
+              aria-label="戻る"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="font-semibold text-sm">セッション完了</h1>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">
+            読み込み中...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (error || !summary) {
+    return (
+      <div className="flex flex-col min-h-[calc(100dvh-5rem)]">
+        <header className="border-b bg-background">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 -ml-2"
+              onClick={() => router.push("/coaching")}
+              aria-label="戻る"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="font-semibold text-sm">セッション完了</h1>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm border-destructive/50">
+            <CardContent className="p-6 text-center">
+              <p className="text-sm text-destructive">
+                {error || "セッション情報を表示できませんでした"}
+              </p>
+              <div className="flex gap-2 justify-center mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/coaching")}
+                >
+                  一覧に戻る
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.location.reload()}
+                >
+                  再読み込み
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-[calc(100dvh-5rem)]">

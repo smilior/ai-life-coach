@@ -1,10 +1,10 @@
 /**
  * AI対話ヘルパー
- * Claude APIを使用したコーチング応答生成
+ * OpenAI APIを使用したコーチング応答生成
  */
 
 import { streamText } from "ai";
-import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import type { CoachingStep, SessionContext, SessionType } from "@/types/ai";
 import { generateSystemPrompt } from "./prompts";
 import {
@@ -16,20 +16,20 @@ import {
 } from "./config";
 
 // ============================================================================
-// Anthropic Provider
+// OpenAI Provider
 // ============================================================================
 
 /**
- * Anthropicプロバイダーを取得（環境変数チェック付き）
+ * OpenAIプロバイダーを取得（環境変数チェック付き）
  */
-function getAnthropicProvider() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+function getOpenAIProvider() {
+  const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     return null;
   }
 
-  return createAnthropic({
+  return createOpenAI({
     apiKey,
   });
 }
@@ -38,7 +38,7 @@ function getAnthropicProvider() {
  * API Keyが利用可能かどうかチェック
  */
 export function isAIAvailable(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+  return !!process.env.OPENAI_API_KEY;
 }
 
 // ============================================================================
@@ -194,11 +194,11 @@ export async function generateCoachingResponse(params: {
     { role: "user" as const, content: message },
   ];
 
-  // Anthropicプロバイダー取得
-  const anthropic = getAnthropicProvider();
+  // OpenAIプロバイダー取得
+  const openai = getOpenAIProvider();
 
   // API Key未設定時はモック応答
-  if (!anthropic) {
+  if (!openai) {
     const mockText = generateMockResponse(message, currentStep);
     return {
       stream: null,
@@ -214,13 +214,17 @@ export async function generateCoachingResponse(params: {
 
   // ストリーミング応答生成
   const result = streamText({
-    model: anthropic(aiConfig.model),
+    model: openai(aiConfig.model),
     system: systemPrompt,
     messages,
     maxOutputTokens: aiConfig.maxOutputTokens,
     temperature: aiConfig.parameters.temperature,
     topP: aiConfig.parameters.topP,
-    topK: aiConfig.parameters.topK,
+    providerOptions: {
+      openai: {
+        reasoningEffort: aiConfig.parameters.reasoningEffort,
+      },
+    },
   });
 
   return {

@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MoreVertical } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ArrowLeft, MoreVertical, CheckCircle2 } from "lucide-react";
 import {
   ChatMessage,
   ChatInput,
@@ -14,33 +22,139 @@ import {
 } from "@/components/features/coaching";
 import type { CoachingStep } from "@/types/ai";
 
+const INITIAL_GREETING: ChatMessageData = {
+  id: "initial",
+  role: "assistant",
+  content:
+    "こんにちは！AIライフコーチです。\n\n今日はどんなことについて話しましょうか？\n目標に向けた進捗や、最近感じていることなど、なんでも気軽に話してくださいね。",
+  timestamp: new Date(),
+  step: 1,
+};
+
 /**
  * コーチングチャット画面
  * - AIとのリアルタイム対話
  * - ストリーミング応答UI
  * - 9ステップ進捗表示
  * - モバイルファーストレイアウト
+ * - セッション再開対応（?session=パラメータ）
  */
 export default function CoachingChatPage() {
+  return (
+    <Suspense fallback={<ChatLoadingFallback />}>
+      <CoachingChatContent />
+    </Suspense>
+  );
+}
+
+function ChatLoadingFallback() {
+  return (
+    <div className="flex h-[calc(100dvh-5rem)] items-center justify-center">
+      <p className="text-sm text-muted-foreground">読み込み中...</p>
+    </div>
+  );
+}
+
+function CoachingChatContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const existingSessionId = searchParams.get("session");
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [messages, setMessages] = useState<ChatMessageData[]>([
-    {
-      id: "initial",
-      role: "assistant",
-      content:
-        "こんにちは！AIライフコーチです。\n\n今日はどんなことについて話しましょうか？\n目標に向けた進捗や、最近感じていることなど、なんでも気軽に話してくださいね。",
-      timestamp: new Date(),
-      step: 1,
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [currentStep, setCurrentStep] = useState<CoachingStep>(1);
   const [isTyping, setIsTyping] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
     null
   );
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [isSessionEnded, setIsSessionEnded] = useState(false);
+  const [showEndDialog, setShowEndDialog] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
+  const sessionInitRef = useRef(false);
+
+  // セッション初期化（既存セッション読み込み or 新規作成）
+  useEffect(() => {
+    if (sessionInitRef.current) return;
+    sessionInitRef.current = true;
+
+    async function initSession() {
+      try {
+        if (existingSessionId) {
+          // 既存セッションを読み込む
+          const res = await fetch(
+            `/api/coaching/sessions/${existingSessionId}`
+          );
+          if (res.ok) {
+            const json = await res.json();
+            const session = json.data;
+            setSessionId(session.id);
+            setCurrentStep(
+              (session.currentStep as CoachingStep) || 1
+            );
+
+            // DB のメッセージ履歴を反映
+            if (session.messages && session.messages.length > 0) {
+              const loadedMessages: ChatMessageData[] =
+                session.messages.map(
+                  (m: {
+                    id: string;
+                    role: string;
+                    content: string;
+                    step: number | null;
+                    createdAt: string;
+                  }) => ({
+                    id: m.id,
+                    role: m.role as "user" | "assistant",
+                    content: m.content,
+                    timestamp: new Date(m.createdAt),
+                    step: m.step ?? undefined,
+                  })
+                );
+              setMessages(loadedMessages);
+            } else {
+              // メッセージがない既存セッションの場合は挨拶を表示
+              setMessages([INITIAL_GREETING]);
+            }
+          } else {
+            // セッション取得失敗時は新規作成にフォールバック
+            console.error(
+              "Failed to load session, creating new:",
+              res.status
+            );
+            await createNewSession();
+          }
+        } else {
+          // 新規セッション作成
+          await createNewSession();
+        }
+      } catch (err) {
+        console.error("Failed to init session:", err);
+      } finally {
+        setIsLoadingSession(false);
+      }
+    }
+
+    async function createNewSession() {
+      const res = await fetch("/api/coaching/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionType: "free" }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setSessionId(json.data.id);
+        setMessages([INITIAL_GREETING]);
+      } else {
+        console.error("Failed to create session:", res.status);
+      }
+    }
+
+    initSession();
+  }, [existingSessionId]);
 
   // メッセージ追加時に自動スクロール
   const scrollToBottom = useCallback(() => {
@@ -54,10 +168,12 @@ export default function CoachingChatPage() {
   /**
    * メッセージ送信ハンドラ
    * - ユーザーメッセージを追加
-   * - AIの応答をストリーミングシミュレーション
+   * - AIの応答をストリーミング表示
    */
   const handleSend = useCallback(
     async (content: string) => {
+      if (!sessionId) return;
+
       // ユーザーメッセージの追加
       const userMessage: ChatMessageData = {
         id: `user-${Date.now()}`,
@@ -70,32 +186,76 @@ export default function CoachingChatPage() {
       // タイピングインジケーター表示
       setIsTyping(true);
 
-      // AIの応答をシミュレート（実際のAPI接続時に置き換え）
       try {
-        const response = await simulateAIResponse(content, currentStep);
+        const res = await fetch("/api/coaching/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            message: content,
+            step: currentStep,
+          }),
+        });
 
         setIsTyping(false);
+
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`);
+        }
 
         const assistantMessageId = `assistant-${Date.now()}`;
         setStreamingMessageId(assistantMessageId);
 
-        // ストリーミング表示のシミュレーション
-        const fullText = response.message;
-        let displayedText = "";
-
+        // アシスタントメッセージの枠を追加
         const assistantMessage: ChatMessageData = {
           id: assistantMessageId,
           role: "assistant",
           content: "",
           timestamp: new Date(),
-          step: response.nextStep || currentStep,
+          step: currentStep,
         };
         setMessages((prev) => [...prev, assistantMessage]);
 
-        // 文字を逐次表示
-        for (let i = 0; i < fullText.length; i++) {
-          displayedText += fullText[i];
-          const currentText = displayedText;
+        // JSON応答（モック）の場合
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const json = await res.json();
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: json.message }
+                : msg
+            )
+          );
+          setStreamingMessageId(null);
+          if (json.step) {
+            setCurrentStep(json.step as CoachingStep);
+          }
+          // 自動終了シグナル検知
+          if (json.shouldEndSession) {
+            setIsSessionEnded(true);
+            setTimeout(() => {
+              router.push(`/coaching/summary/${sessionId}`);
+            }, 3000);
+          }
+          return;
+        }
+
+        // ストリーミング応答の処理
+        const sessionEndHeader = res.headers.get("X-Session-End");
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let fullText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          fullText += chunk;
+          const currentText = fullText;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
@@ -103,16 +263,16 @@ export default function CoachingChatPage() {
                 : msg
             )
           );
-          // 句読点の後は少し長めのディレイ
-          const isPunctuation = /[。！？\n]/.test(fullText[i]);
-          await delay(isPunctuation ? 60 : 20);
         }
 
         setStreamingMessageId(null);
 
-        // ステップを進める
-        if (response.nextStep) {
-          setCurrentStep(response.nextStep);
+        // 自動終了シグナル検知（ストリーミング）
+        if (sessionEndHeader === "true") {
+          setIsSessionEnded(true);
+          setTimeout(() => {
+            router.push(`/coaching/summary/${sessionId}`);
+          }, 3000);
         }
       } catch {
         setIsTyping(false);
@@ -129,10 +289,32 @@ export default function CoachingChatPage() {
         setMessages((prev) => [...prev, errorMessage]);
       }
     },
-    [currentStep]
+    [currentStep, sessionId, router]
   );
 
-  const isInputDisabled = isTyping || streamingMessageId !== null;
+  // 手動セッション終了ハンドラ
+  const handleEndSession = useCallback(async () => {
+    if (!sessionId) return;
+    setIsEnding(true);
+    try {
+      const res = await fetch(`/api/coaching/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (res.ok) {
+        setShowEndDialog(false);
+        router.push(`/coaching/summary/${sessionId}`);
+      }
+    } catch (err) {
+      console.error("Failed to end session:", err);
+    } finally {
+      setIsEnding(false);
+    }
+  }, [sessionId, router]);
+
+  const isInputDisabled =
+    isTyping || streamingMessageId !== null || !sessionId || isLoadingSession || isSessionEnded;
 
   return (
     <div className="flex h-[calc(100dvh-5rem)] flex-col">
@@ -164,6 +346,7 @@ export default function CoachingChatPage() {
             size="icon"
             className="shrink-0"
             aria-label="メニュー"
+            onClick={() => setShowEndDialog(true)}
           >
             <MoreVertical className="h-5 w-5" />
           </Button>
@@ -179,7 +362,7 @@ export default function CoachingChatPage() {
           {/* 進捗バー */}
           <div className="flex justify-center">
             <div className="bg-muted rounded-full px-3 py-1 text-xs text-muted-foreground">
-              セッション開始
+              {existingSessionId ? "セッション再開" : "セッション開始"}
             </div>
           </div>
 
@@ -200,75 +383,54 @@ export default function CoachingChatPage() {
         </div>
       </div>
 
-      {/* 入力エリア */}
-      <ChatInput onSend={handleSend} disabled={isInputDisabled} />
+      {/* 入力エリア or 完了バナー */}
+      {isSessionEnded ? (
+        <div className="border-t bg-muted/50 p-4">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex items-center gap-2 text-primary">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="font-medium text-sm">セッションが完了しました</span>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => router.push(`/coaching/summary/${sessionId}`)}
+            >
+              サマリーを見る
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <ChatInput onSend={handleSend} disabled={isInputDisabled} />
+      )}
+
+      {/* セッション終了確認ダイアログ */}
+      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>セッションを終了しますか？</DialogTitle>
+            <DialogDescription>
+              現在のセッションを終了して、サマリーページに移動します。終了後はこのセッションに新しいメッセージを送ることはできません。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEndDialog(false)}
+              disabled={isEnding}
+            >
+              キャンセル
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleEndSession}
+              disabled={isEnding}
+            >
+              {isEnding ? "終了中..." : "セッションを終了"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/**
- * AI応答のシミュレーション
- * 実際のAPI連携時にはここをfetch/streamに置き換える
- */
-async function simulateAIResponse(
-  userMessage: string,
-  currentStep: CoachingStep
-): Promise<{ message: string; nextStep?: CoachingStep }> {
-  await delay(800 + Math.random() * 700);
-
-  const responses: Record<number, { message: string; nextStep?: CoachingStep }> =
-    {
-      1: {
-        message: `${userMessage.includes("仕事") ? "仕事のことで悩んでいるんですね。" : "そうなんですね。"}お話しくださりありがとうございます。\n\nその状況は大変ですよね。あなたの気持ち、よくわかります。\n\nもし今の状況が理想的に解決したとしたら、どんな状態になっていますか？具体的にイメージしてみてください。`,
-        nextStep: 2,
-      },
-      2: {
-        message:
-          "素敵なビジョンですね！\n\nそのような理想の状態に向けて、別の見方をしてみましょう。今の経験は、実はあなたの成長にとって大切なステップなのかもしれません。\n\n10点を理想の状態として、今は何点くらいだと感じますか？",
-        nextStep: 3,
-      },
-      3: {
-        message:
-          "なるほど、ありがとうございます。\n\n最近、少しでもうまくいった時はありましたか？小さなことでも構いません。\n\nうまくいった時のことを教えていただけると、あなたの強みが見えてくるかもしれません。",
-        nextStep: 4,
-      },
-      4: {
-        message:
-          "それは素晴らしいですね！既にそういった経験があるということは、あなたには乗り越える力があるということです。\n\nお話を聞いていて、**粘り強さ**と**前向きに取り組む姿勢**という強みを感じました。\n\nこの強みを活かして、いくつかの選択肢を考えてみましょう。",
-        nextStep: 5,
-      },
-      5: {
-        message:
-          "いくつかのアプローチがありそうですね。\n\n**選択肢1**: 毎朝5分だけ、優先事項を整理する\n**選択肢2**: 週の初めに30分、計画を立てる時間を確保する\n**選択肢3**: 信頼できる人に相談して、サポートを得る\n\nどれが一番しっくりきますか？他にも思いつくものがあれば教えてください。",
-        nextStep: 6,
-      },
-      6: {
-        message:
-          "いい選択ですね！\n\nでは、その最初の一歩を**2分で始められる形**にしてみましょう。\n\n明日の朝、最初にできる小さなアクションは何ですか？\n\n例えば「スマホのメモを開いて、今日やることを1つだけ書く」のような、本当に小さなことで大丈夫ですよ。",
-        nextStep: 7,
-      },
-      7: {
-        message:
-          "素晴らしいですね！それなら無理なく続けられそうです。\n\n今日のセッションをまとめると...\n\n**あなたの強み**: 粘り強さ、前向きな姿勢\n**次のアクション**: 明日の朝から始めてみましょう\n\nあなたならきっとできます。小さな一歩を大切にしていきましょう。\n\nまた話したくなったら、いつでも声をかけてくださいね。",
-        nextStep: 8,
-      },
-      8: {
-        message:
-          "今日のセッション、とても実りのある時間でしたね！\n\nあなたが自分自身と向き合い、一歩を踏み出そうとしていること自体が、大きな前進です。\n\nこの目標を習慣として登録しますか？日々のリマインドで、継続をサポートできますよ。",
-        nextStep: 9,
-      },
-      9: {
-        message:
-          "わかりました！\n\nいつでもまた話しかけてくださいね。あなたの成長を応援しています。\n\n素敵な一日をお過ごしください。",
-      },
-    };
-
-  return responses[currentStep] || responses[1];
-}
-
-/**
- * ディレイユーティリティ
- */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

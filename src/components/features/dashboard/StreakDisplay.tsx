@@ -9,14 +9,9 @@ interface StreakDisplayProps {
   bestStreak?: number;
 }
 
-const MOCK_STREAK = {
-  currentStreak: 5,
-  bestStreak: 12,
-};
-
 export function StreakDisplay({
-  currentStreak = MOCK_STREAK.currentStreak,
-  bestStreak = MOCK_STREAK.bestStreak,
+  currentStreak = 0,
+  bestStreak = 0,
 }: StreakDisplayProps) {
   return (
     <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 dark:border-orange-900 dark:from-orange-950/30 dark:to-amber-950/30">

@@ -16,6 +16,9 @@ function createAuth() {
         verification: schema.verifications,
       },
     }),
+    emailAndPassword: {
+      enabled: true,
+    },
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID || "",

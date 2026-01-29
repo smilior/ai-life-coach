@@ -1,51 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MessageCircle, Sparkles } from "lucide-react";
+import { Plus, MessageCircle, Sparkles, Loader2 } from "lucide-react";
 import { SessionCard, type SessionData } from "@/components/features/coaching";
+import type { CoachingStep } from "@/types/ai";
 
 /**
- * デモ用のセッションデータ
- * 実際のAPI連携時にはサーバーからフェッチする
+ * APIレスポンスのセッション型
  */
-const DEMO_SESSIONS: SessionData[] = [
-  {
-    id: "session-active-1",
-    theme: "仕事のストレス対策",
-    status: "active",
-    currentStep: 5,
-    startedAt: new Date(Date.now() - 10 * 60 * 1000),
-    messageCount: 8,
-  },
-  {
-    id: "session-completed-1",
-    theme: "キャリアの方向性",
-    status: "completed",
-    startedAt: new Date("2026-01-22T10:00:00"),
-    endedAt: new Date("2026-01-22T10:15:00"),
-    messageCount: 12,
-  },
-  {
-    id: "session-completed-2",
-    theme: "運動習慣の確立",
-    status: "completed",
-    startedAt: new Date("2026-01-20T09:00:00"),
-    endedAt: new Date("2026-01-20T09:10:00"),
-    messageCount: 10,
-  },
-  {
-    id: "session-completed-3",
-    theme: "時間管理の改善",
-    status: "completed",
-    startedAt: new Date("2026-01-18T14:00:00"),
-    endedAt: new Date("2026-01-18T14:12:00"),
-    messageCount: 9,
-  },
-];
+interface ApiSessionResponse {
+  id: string;
+  title: string;
+  sessionType: string;
+  status: string;
+  currentStep: number;
+  startedAt: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * APIレスポンスをSessionDataに変換
+ */
+function mapApiSessionToSessionData(apiSession: ApiSessionResponse): SessionData {
+  const status: "active" | "completed" =
+    apiSession.status === "active" ? "active" : "completed";
+
+  const currentStep =
+    apiSession.currentStep >= 1 && apiSession.currentStep <= 9
+      ? (apiSession.currentStep as CoachingStep)
+      : undefined;
+
+  return {
+    id: apiSession.id,
+    theme: apiSession.title,
+    status,
+    currentStep,
+    startedAt: new Date(apiSession.startedAt),
+    endedAt: apiSession.completedAt
+      ? new Date(apiSession.completedAt)
+      : undefined,
+  };
+}
 
 /**
  * セッション管理画面
@@ -54,7 +55,40 @@ const DEMO_SESSIONS: SessionData[] = [
  * - 過去のセッション履歴
  */
 export default function CoachingPage() {
-  const [sessions] = useState<SessionData[]>(DEMO_SESSIONS);
+  const [sessions, setSessions] = useState<SessionData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchSessions() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await fetch("/api/coaching/sessions");
+        if (!response.ok) {
+          throw new Error("セッションの取得に失敗しました");
+        }
+        const json = await response.json();
+        if (json.success && Array.isArray(json.data)) {
+          setSessions(json.data.map(mapApiSessionToSessionData));
+        } else {
+          setSessions([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch coaching sessions:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "セッションの取得に失敗しました"
+        );
+        setSessions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchSessions();
+  }, []);
 
   const activeSessions = sessions.filter((s) => s.status === "active");
   const completedSessions = sessions.filter((s) => s.status === "completed");
@@ -101,36 +135,68 @@ export default function CoachingPage() {
             </CardContent>
           </Card>
 
-          {/* 進行中のセッション */}
-          {activeSessions.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                進行中のセッション
-              </h2>
-              <div className="space-y-3">
-                {activeSessions.map((session) => (
-                  <SessionCard key={session.id} session={session} />
-                ))}
-              </div>
-            </section>
+          {/* ローディング状態 */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">
+                読み込み中...
+              </span>
+            </div>
           )}
 
-          {/* 過去のセッション */}
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-3">
-              過去のセッション
-            </h2>
-            {completedSessions.length > 0 ? (
-              <div className="space-y-2">
-                {completedSessions.map((session) => (
-                  <SessionCard key={session.id} session={session} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState />
-            )}
-          </section>
+          {/* エラー状態 */}
+          {!isLoading && error && (
+            <Card className="border-destructive/50">
+              <CardContent className="p-4 text-center">
+                <p className="text-sm text-destructive">{error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => window.location.reload()}
+                >
+                  再読み込み
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* セッション一覧 */}
+          {!isLoading && !error && (
+            <>
+              {/* 進行中のセッション */}
+              {activeSessions.length > 0 && (
+                <section>
+                  <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    進行中のセッション
+                  </h2>
+                  <div className="space-y-3">
+                    {activeSessions.map((session) => (
+                      <SessionCard key={session.id} session={session} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* 過去のセッション */}
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground mb-3">
+                  過去のセッション
+                </h2>
+                {completedSessions.length > 0 ? (
+                  <div className="space-y-2">
+                    {completedSessions.map((session) => (
+                      <SessionCard key={session.id} session={session} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState />
+                )}
+              </section>
+            </>
+          )}
         </div>
       </div>
     </div>

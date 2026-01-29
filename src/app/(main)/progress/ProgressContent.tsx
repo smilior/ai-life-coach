@@ -20,7 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-// --- Mock Data ---
+// --- Types & Defaults ---
 
 interface HabitStat {
   name: string;
@@ -39,64 +39,37 @@ interface StreakPoint {
   streak: number;
 }
 
-const mockStats = {
-  currentStreak: 5,
-  bestStreak: 23,
-  totalCompleted: 156,
-  overallRate: 87,
-  totalHabits: 4,
+interface WeeklyStat {
+  day: string;
+  completed: number;
+  total: number;
+}
+
+const stats = {
+  currentStreak: 0,
+  bestStreak: 0,
+  totalCompleted: 0,
+  overallRate: 0,
+  totalHabits: 0,
 };
 
-const mockWeeklyStats = [
-  { day: "月", completed: 4, total: 4 },
-  { day: "火", completed: 3, total: 4 },
-  { day: "水", completed: 4, total: 4 },
-  { day: "木", completed: 2, total: 4 },
-  { day: "金", completed: 4, total: 4 },
-  { day: "土", completed: 3, total: 4 },
-  { day: "日", completed: 0, total: 4 },
-];
+const weeklyStats: WeeklyStat[] = [];
 
-const mockHabitStats: HabitStat[] = [
-  { name: "朝の瞑想", completionRate: 92, totalCompleted: 45 },
-  { name: "読書", completionRate: 85, totalCompleted: 38 },
-  { name: "運動", completionRate: 70, totalCompleted: 32 },
-  { name: "日記を書く", completionRate: 78, totalCompleted: 41 },
-];
+const habitStats: HabitStat[] = [];
 
-const mockStreakTrend: StreakPoint[] = [
-  { week: "4週前", streak: 3 },
-  { week: "3週前", streak: 7 },
-  { week: "2週前", streak: 12 },
-  { week: "先週", streak: 5 },
-  { week: "今週", streak: 5 },
-];
+const streakTrend: StreakPoint[] = [];
+
+const emptyStateMessage = "まだデータがありません。習慣を登録して記録を始めましょう。";
 
 function generateCalendarData(year: number, month: number): DayRecord[] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date();
   const records: DayRecord[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(year, month, d);
-    const isPast = date < today;
-    const isToday =
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate();
-    if (isPast || isToday) {
-      const rand = Math.random();
-      records.push({
-        date: d,
-        completedAll: rand > 0.3,
-        completedSome: rand > 0.1,
-      });
-    } else {
-      records.push({
-        date: d,
-        completedAll: false,
-        completedSome: false,
-      });
-    }
+    records.push({
+      date: d,
+      completedAll: false,
+      completedSome: false,
+    });
   }
   return records;
 }
@@ -104,6 +77,16 @@ function generateCalendarData(year: number, month: number): DayRecord[] {
 // --- Components ---
 
 function StatsSummary() {
+  if (stats.totalHabits === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-sm text-muted-foreground">
+          {emptyStateMessage}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <section className="space-y-3">
       {/* メインストリーク */}
@@ -111,7 +94,7 @@ function StatsSummary() {
         <CardContent className="p-5 text-center">
           <Flame className="mx-auto mb-2 h-10 w-10 text-orange-500" />
           <p className="text-5xl font-extrabold text-orange-600 dark:text-orange-400">
-            {mockStats.bestStreak}
+            {stats.bestStreak}
           </p>
           <p className="mt-1 text-sm font-medium text-orange-700/80 dark:text-orange-300/80">
             最長ストリーク
@@ -124,21 +107,21 @@ function StatsSummary() {
         <Card>
           <CardContent className="p-3 text-center">
             <Target className="mx-auto mb-1 h-5 w-5 text-primary" />
-            <p className="text-xl font-bold">{mockStats.overallRate}%</p>
+            <p className="text-xl font-bold">{stats.overallRate}%</p>
             <p className="text-[10px] text-muted-foreground">達成率</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 text-center">
             <CheckCircle2 className="mx-auto mb-1 h-5 w-5 text-green-500" />
-            <p className="text-xl font-bold">{mockStats.totalCompleted}</p>
+            <p className="text-xl font-bold">{stats.totalCompleted}</p>
             <p className="text-[10px] text-muted-foreground">完了回数</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 text-center">
             <Trophy className="mx-auto mb-1 h-5 w-5 text-amber-500" />
-            <p className="text-xl font-bold">{mockStats.totalHabits}</p>
+            <p className="text-xl font-bold">{stats.totalHabits}</p>
             <p className="text-[10px] text-muted-foreground">習慣数</p>
           </CardContent>
         </Card>
@@ -148,11 +131,26 @@ function StatsSummary() {
 }
 
 function WeeklyChart() {
-  const totalCompleted = mockWeeklyStats.reduce(
+  if (weeklyStats.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">今週の達成状況</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">
+            {emptyStateMessage}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalCompleted = weeklyStats.reduce(
     (acc, d) => acc + d.completed,
     0
   );
-  const totalTasks = mockWeeklyStats.reduce((acc, d) => acc + d.total, 0);
+  const totalTasks = weeklyStats.reduce((acc, d) => acc + d.total, 0);
   const weeklyRate =
     totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
@@ -168,7 +166,7 @@ function WeeklyChart() {
       </CardHeader>
       <CardContent>
         <div className="flex justify-between">
-          {mockWeeklyStats.map((stat) => {
+          {weeklyStats.map((stat) => {
             const rate =
               stat.total > 0 ? (stat.completed / stat.total) * 100 : 0;
             return (
@@ -211,17 +209,23 @@ function HabitBreakdown() {
         <CardTitle className="text-base">習慣別の達成率</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {mockHabitStats.map((habit) => (
-          <div key={habit.name} className="space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">{habit.name}</span>
-              <span className="text-muted-foreground">
-                {habit.completionRate}%
-              </span>
+        {habitStats.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground">
+            {emptyStateMessage}
+          </p>
+        ) : (
+          habitStats.map((habit) => (
+            <div key={habit.name} className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{habit.name}</span>
+                <span className="text-muted-foreground">
+                  {habit.completionRate}%
+                </span>
+              </div>
+              <Progress value={habit.completionRate} className="h-2.5" />
             </div>
-            <Progress value={habit.completionRate} className="h-2.5" />
-          </div>
-        ))}
+          ))
+        )}
       </CardContent>
     </Card>
   );
@@ -244,7 +248,6 @@ function CalendarView() {
 
   // Calculate calendar grid
   const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Sun
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 
   const prevMonth = () => {
@@ -351,7 +354,25 @@ function CalendarView() {
 }
 
 function StreakTrend() {
-  const maxStreak = Math.max(...mockStreakTrend.map((p) => p.streak));
+  if (streakTrend.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base">ストリーク推移</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">
+            {emptyStateMessage}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const maxStreak = Math.max(...streakTrend.map((p) => p.streak), 0);
 
   return (
     <Card>
@@ -363,7 +384,7 @@ function StreakTrend() {
       </CardHeader>
       <CardContent>
         <div className="flex items-end justify-between gap-2">
-          {mockStreakTrend.map((point) => {
+          {streakTrend.map((point) => {
             const heightPercent =
               maxStreak > 0 ? (point.streak / maxStreak) * 100 : 0;
             return (
