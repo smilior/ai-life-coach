@@ -13,18 +13,21 @@ setup("authenticate", async ({ page }) => {
   // Better Auth でユーザー登録（セッションCookieも自動設定される）
   const signUpRes = await page.request.post(
     `${BASE}/api/auth/sign-up/email`,
-    { data: { email, password, name } }
+    {
+      data: { email, password, name },
+      headers: { Origin: BASE },
+    }
   );
   expect(signUpRes.ok()).toBeTruthy();
 
   // オンボーディング完了プロフィールを作成
-  const headers: Record<string, string> = {};
+  const profileHeaders: Record<string, string> = { Origin: BASE };
   if (process.env.E2E_TEST_SECRET) {
-    headers["x-e2e-secret"] = process.env.E2E_TEST_SECRET;
+    profileHeaders["x-e2e-secret"] = process.env.E2E_TEST_SECRET;
   }
   const profileRes = await page.request.post(
     `${BASE}/api/auth/test-login`,
-    { data: { email }, headers }
+    { data: { email }, headers: profileHeaders }
   );
   expect(profileRes.ok()).toBeTruthy();
 
