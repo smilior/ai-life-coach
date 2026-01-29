@@ -12,12 +12,24 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = getDb();
-    const result = await db.all(
+    const tables = await db.all(
       sql`SELECT name FROM sqlite_master WHERE type='table'`
+    );
+    const usersSchema = await db.all(
+      sql`PRAGMA table_info(users)`
+    );
+    const accountsSchema = await db.all(
+      sql`PRAGMA table_info(accounts)`
+    );
+    const sessionsSchema = await db.all(
+      sql`PRAGMA table_info(sessions)`
     );
     return NextResponse.json({
       dbConnected: true,
-      tables: result,
+      tables,
+      usersSchema,
+      accountsSchema,
+      sessionsSchema,
       envCheck: {
         hasBetterAuthSecret: !!process.env.BETTER_AUTH_SECRET,
         hasAppUrl: !!process.env.NEXT_PUBLIC_APP_URL,
