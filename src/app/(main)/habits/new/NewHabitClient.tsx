@@ -1,12 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { HabitForm, type HabitFormData } from "@/components/features/habits";
 
-export function NewHabitClient() {
+function NewHabitForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (data: HabitFormData) => {
     const res = await fetch("/api/habits", {
@@ -23,6 +25,14 @@ export function NewHabitClient() {
     router.push("/habits");
     router.refresh();
   };
+
+  const initialData: Partial<HabitFormData> = {};
+  const name = searchParams.get("name");
+  const description = searchParams.get("description");
+  const twoMinuteVersion = searchParams.get("twoMinuteVersion");
+  if (name) initialData.name = name;
+  if (description) initialData.description = description;
+  if (twoMinuteVersion) initialData.twoMinuteVersion = twoMinuteVersion;
 
   return (
     <div className="container mx-auto max-w-md px-4 py-6">
@@ -42,7 +52,19 @@ export function NewHabitClient() {
       </div>
 
       {/* Form */}
-      <HabitForm onSubmit={handleSubmit} submitLabel="習慣を作成" />
+      <HabitForm
+        onSubmit={handleSubmit}
+        submitLabel="習慣を作成"
+        initialData={Object.keys(initialData).length > 0 ? initialData : undefined}
+      />
     </div>
+  );
+}
+
+export function NewHabitClient() {
+  return (
+    <Suspense>
+      <NewHabitForm />
+    </Suspense>
   );
 }

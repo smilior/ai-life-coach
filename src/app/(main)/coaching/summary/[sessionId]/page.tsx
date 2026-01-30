@@ -447,7 +447,20 @@ export default function SessionSummaryPage() {
           {/* アクションボタン */}
           <div className="space-y-2 pt-2 pb-4">
             <Button asChild className="w-full" size="lg">
-              <Link href="/habits/new">
+              <Link
+                href={(() => {
+                  const params = new URLSearchParams();
+                  if (summary.goal) params.set("name", summary.goal);
+                  if (summary.actionItems.length > 0) {
+                    params.set("twoMinuteVersion", summary.actionItems[0]);
+                  }
+                  if (summary.currentState) {
+                    params.set("description", summary.currentState);
+                  }
+                  const qs = params.toString();
+                  return `/habits/new${qs ? `?${qs}` : ""}`;
+                })()}
+              >
                 <Target className="h-4 w-4 mr-2" />
                 この目標を習慣に登録
               </Link>
