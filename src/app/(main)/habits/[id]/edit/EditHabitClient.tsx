@@ -32,7 +32,6 @@ interface HabitData {
   trigger: string | null;
   ifThenPlan: string | null;
   frequency: string;
-  reminderTime: string | null;
   isActive: boolean;
 }
 
@@ -145,7 +144,6 @@ export function EditHabitClient({ habitId }: { habitId: string }) {
     trigger: habit.trigger ?? undefined,
     ifThenPlan: habit.ifThenPlan ?? undefined,
     frequency: (habit.frequency ?? "daily") as HabitFormData["frequency"],
-    reminderTime: habit.reminderTime ?? undefined,
   };
 
   return (

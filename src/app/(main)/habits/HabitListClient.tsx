@@ -20,7 +20,6 @@ interface HabitItem {
   description: string | null;
   category: string;
   twoMinuteVersion: string | null;
-  reminderTime: string | null;
   frequency: string;
   currentStreak: number;
   bestStreak: number;
@@ -188,7 +187,6 @@ export function HabitListClient() {
             currentStreak={habit.currentStreak}
             completedToday={habit.completedToday}
             twoMinuteVersion={habit.twoMinuteVersion}
-            reminderTime={habit.reminderTime}
             frequency={habit.frequency}
             onCheck={handleCheck}
           />

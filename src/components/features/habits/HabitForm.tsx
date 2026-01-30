@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Lightbulb,
-  Clock,
   Target,
   ArrowRight,
   Loader2,
@@ -30,7 +29,6 @@ export interface HabitFormData {
   ifThenPlan?: string;
   frequency: "daily" | "weekdays" | "weekends" | "custom";
   customDays?: number[];
-  reminderTime?: string;
   targetDays?: number;
 }
 
@@ -99,9 +97,6 @@ export function HabitForm({
   const [customDays, setCustomDays] = useState<number[]>(
     initialData?.customDays ?? []
   );
-  const [reminderTime, setReminderTime] = useState(
-    initialData?.reminderTime ?? ""
-  );
   const [targetDays, setTargetDays] = useState<string>(
     initialData?.targetDays?.toString() ?? ""
   );
@@ -141,7 +136,6 @@ export function HabitForm({
           ifThenPlan: ifThenPlan.trim() || undefined,
           frequency,
           customDays: frequency === "custom" ? customDays : undefined,
-          reminderTime: reminderTime || undefined,
           targetDays: targetDays ? parseInt(targetDays) : undefined,
         });
       } catch {
@@ -317,23 +311,6 @@ export function HabitForm({
             )}
           </div>
         )}
-      </div>
-
-      {/* リマインダー */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <Label htmlFor="reminder" className="font-semibold">
-            リマインダー時間
-          </Label>
-        </div>
-        <Input
-          id="reminder"
-          type="time"
-          value={reminderTime}
-          onChange={(e) => setReminderTime(e.target.value)}
-          className="min-h-[44px]"
-        />
       </div>
 
       {/* 目標期間 */}

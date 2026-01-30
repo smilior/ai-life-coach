@@ -8,14 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  NotificationSettings,
   AccountSection,
 } from "@/components/features/settings";
-import { getProfile, updateProfile } from "@/lib/actions/profile";
+import { getProfile } from "@/lib/actions/profile";
 import type { ProfileData } from "@/lib/actions/profile";
 import { useSession } from "@/lib/auth/client";
 import {
-  User,
   ChevronRight,
   Moon,
   Info,
@@ -35,36 +33,16 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [habitReminder, setHabitReminder] = useState(true);
-  const [reminderTime, setReminderTime] = useState("08:00");
-  const [coachingNotification, setCoachingNotification] = useState(true);
 
   useEffect(() => {
     const loadProfile = async () => {
       const result = await getProfile();
       if (result.success && result.data) {
         setProfile(result.data);
-        setHabitReminder(result.data.notificationsEnabled);
       }
     };
     loadProfile();
   }, []);
-
-  const handleNotificationChange = async (
-    field: string,
-    value: boolean | string
-  ) => {
-    if (field === "habitReminder") {
-      setHabitReminder(value as boolean);
-      await updateProfile({ notificationsEnabled: value as boolean });
-    } else if (field === "reminderTime") {
-      setReminderTime(value as string);
-      // TODO: Save reminder time when backend supports it
-    } else if (field === "coachingNotification") {
-      setCoachingNotification(value as boolean);
-      // TODO: Save coaching notification setting when backend supports it
-    }
-  };
 
   const userName = profile?.nickname || session?.user?.name || "ユーザー";
   const userImage = session?.user?.image || undefined;
@@ -96,18 +74,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </Link>
-
-      {/* 通知設定 */}
-      <NotificationSettings
-        habitReminder={habitReminder}
-        reminderTime={reminderTime}
-        coachingNotification={coachingNotification}
-        onHabitReminderChange={(v) => handleNotificationChange("habitReminder", v)}
-        onReminderTimeChange={(v) => handleNotificationChange("reminderTime", v)}
-        onCoachingNotificationChange={(v) =>
-          handleNotificationChange("coachingNotification", v)
-        }
-      />
 
       {/* 表示設定 */}
       <Card>

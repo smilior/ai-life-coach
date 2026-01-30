@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { HabitStreak } from "./HabitStreak";
 import { CategoryBadge, type HabitCategory } from "./CategoryBadge";
-import { ChevronRight, Clock } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 interface HabitCardProps {
   id: string;
@@ -17,7 +17,6 @@ interface HabitCardProps {
   currentStreak: number;
   completedToday: boolean;
   twoMinuteVersion?: string | null;
-  reminderTime?: string | null;
   frequency: string;
   onCheck: (habitId: string) => Promise<void>;
 }
@@ -37,7 +36,6 @@ export function HabitCard({
   currentStreak,
   completedToday,
   twoMinuteVersion,
-  reminderTime,
   frequency,
   onCheck,
 }: HabitCardProps) {
@@ -112,12 +110,6 @@ export function HabitCard({
 
               <div className="flex flex-wrap items-center gap-2">
                 <CategoryBadge category={category} />
-                {reminderTime && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {reminderTime}
-                  </span>
-                )}
                 <span className="text-xs text-muted-foreground">
                   {frequencyLabels[frequency] ?? frequency}
                 </span>

@@ -24,7 +24,6 @@ import {
   ArrowLeft,
   Edit,
   Trash2,
-  Clock,
   Target,
   ArrowRight,
   Loader2,
@@ -54,7 +53,6 @@ interface HabitDetail {
   trigger: string | null;
   ifThenPlan: string | null;
   frequency: string;
-  reminderTime: string | null;
   isActive: boolean;
   currentStreak: number;
   bestStreak: number;
@@ -275,12 +273,6 @@ export function HabitDetailClient({ habitId }: { habitId: string }) {
             <span className="text-xs text-muted-foreground">
               {frequencyLabels[habit.frequency] ?? habit.frequency}
             </span>
-            {habit.reminderTime && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                {habit.reminderTime}
-              </span>
-            )}
           </div>
 
           {habit.twoMinuteVersion && (
