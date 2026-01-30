@@ -34,9 +34,11 @@ const sections: HelpSection[] = [
         subtitle: "ダッシュボード",
         image: "/help/09-dashboard.png",
         descriptions: [
-          "挨拶エリア: ユーザー名と今日の日付が表示されます",
-          "デイリーチェックイン: 「今日の気分は？」から気分を選択します",
+          "挨拶エリア: ユーザー名と今日の日付・時間帯に応じた挨拶が表示されます",
+          "ストリーク表示: 現在の連続達成日数と最長記録が表示されます",
+          "今日の習慣: 登録した習慣のチェックリストです。タップして完了を記録できます",
           "コーチングCTA: 「コーチングを始める」でAIコーチとの対話を開始します",
+          "週間進捗: 今週の日別達成状況がドットで表示されます（緑=全達成、黄=半分以上、橙=一部）",
           "ナビゲーションバー: 各機能（ホーム・コーチング・習慣・進捗・設定）に移動します",
         ],
       },
@@ -60,9 +62,20 @@ const sections: HelpSection[] = [
         subtitle: "チャット画面",
         image: "/help/11-coaching-chat.png",
         descriptions: [
+          "AIコーチがオンボーディングで設定した目的・価値観・動機を踏まえてパーソナライズされた対話を行います",
           "ヘッダー: 現在のセッション情報（ステップ番号・テーマ）が表示されます",
           "メッセージエリア: AIコーチとの対話内容が表示されます",
           "入力欄: メッセージを入力して送信ボタン（矢印）で送ります",
+        ],
+      },
+      {
+        subtitle: "セッションサマリー",
+        image: "",
+        descriptions: [
+          "セッション完了後、AIが会話全体を分析して構造化サマリーを自動生成します",
+          "テーマ・目標・現在地・強み・次のステップ・コーチからのメッセージが表示されます",
+          "「おすすめの習慣を登録」ボタンで、AIが提案した習慣を事前入力された状態で登録できます",
+          "一度生成されたサマリーはキャッシュされ、再度開くと即時表示されます",
         ],
       },
     ],
@@ -76,7 +89,8 @@ const sections: HelpSection[] = [
         subtitle: "習慣一覧",
         image: "/help/12-habits.png",
         descriptions: [
-          "習慣管理: 登録した習慣が一覧表示されます。各習慣の達成状況が確認できます",
+          "習慣カード: 登録した習慣が一覧表示されます。チェックボックスで今日の達成を記録できます",
+          "進捗バー: 今日の全体達成率が表示されます",
           "追加ボタン: 新しい習慣を追加できます",
         ],
       },
@@ -84,8 +98,12 @@ const sections: HelpSection[] = [
         subtitle: "新規習慣作成",
         image: "/help/13-habits-new.png",
         descriptions: [
-          "入力フォーム: 習慣名・説明・頻度などの詳細を入力します",
-          "保存ボタン: 入力後に保存して習慣を登録します",
+          "習慣名: 毎日実行する具体的な行動を入力します",
+          "カテゴリ: 健康・学習・仕事・生活・その他から選択します",
+          "2分バージョン: 最初の一歩を2分以内で始められる形にしたものです（例: ランニング → シューズを履く）",
+          "習慣スタッキング: 既存の習慣の後に紐づけるトリガーを設定します（例: 朝コーヒーを入れた後に）",
+          "If-Thenプラン: 「もし〜したら、〜する」形式の実行計画を設定します",
+          "頻度: 毎日・平日・週末・カスタム（曜日選択）から選べます",
         ],
       },
     ],
@@ -114,8 +132,10 @@ const sections: HelpSection[] = [
         subtitle: "設定ページ",
         image: "/help/15-settings.png",
         descriptions: [
-          "プロフィールセクション: ユーザー名とアイコンが表示されます",
-          "設定項目: 通知・ダークモード・アカウント情報などを変更できます",
+          "プロフィールセクション: ユーザー名とアイコンが表示されます。タップしてプロフィール編集へ",
+          "表示設定: ダークモードの切り替え（準備中）",
+          "アカウント: ログアウトやアカウント削除",
+          "アプリ情報: バージョン情報、使い方ガイド、プライバシーポリシー、利用規約、お問い合わせ",
         ],
       },
       {
@@ -123,7 +143,7 @@ const sections: HelpSection[] = [
         image: "/help/16-settings-profile.png",
         descriptions: [
           "ニックネーム入力: 表示名を変更できます",
-          "目的の変更: オンボーディングで設定した目的を変更できます",
+          "目的の変更: オンボーディングで設定した目的を変更できます。変更はその後のコーチングに反映されます",
           "保存ボタン: 変更を保存します",
         ],
       },
@@ -190,14 +210,16 @@ export default function HelpContent() {
                           {item.subtitle}
                         </h3>
                       )}
-                      <div className="overflow-hidden rounded-lg border p-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.image}
-                          alt={item.subtitle}
-                          className="w-full h-auto rounded"
-                        />
-                      </div>
+                      {item.image && (
+                        <div className="overflow-hidden rounded-lg border p-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.image}
+                            alt={item.subtitle}
+                            className="w-full h-auto rounded"
+                          />
+                        </div>
+                      )}
                       <ul className="space-y-2 text-sm text-muted-foreground">
                         {item.descriptions.map((desc, i) => (
                           <li key={i} className="flex gap-2">
