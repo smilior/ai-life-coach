@@ -22,6 +22,7 @@ import {
   FileText,
   Shield,
   Mail,
+  HelpCircle,
 } from "lucide-react";
 
 const PURPOSE_LABELS: Record<string, string> = {
@@ -151,6 +152,19 @@ export default function SettingsPage() {
             </div>
             <span className="text-sm text-muted-foreground">0.1.0</span>
           </div>
+
+          <Separator className="mx-3" />
+
+          <Link
+            href="/help"
+            className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm transition-colors hover:bg-accent/50"
+          >
+            <div className="flex items-center gap-3">
+              <HelpCircle className="h-5 w-5 text-muted-foreground" />
+              <span>使い方ガイド</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
 
           <Separator className="mx-3" />
 
