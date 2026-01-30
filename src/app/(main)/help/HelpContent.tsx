@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft,
@@ -191,11 +190,10 @@ export default function HelpContent() {
                         </h3>
                       )}
                       <div className="overflow-hidden rounded-lg border">
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={item.image}
                           alt={item.subtitle}
-                          width={390}
-                          height={844}
                           className="w-full h-auto"
                         />
                       </div>
