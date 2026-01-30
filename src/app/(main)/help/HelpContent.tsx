@@ -189,12 +189,12 @@ export default function HelpContent() {
                           {item.subtitle}
                         </h3>
                       )}
-                      <div className="overflow-hidden rounded-lg border">
+                      <div className="overflow-hidden rounded-lg border p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={item.image}
                           alt={item.subtitle}
-                          className="w-full h-auto"
+                          className="w-full h-auto rounded"
                         />
                       </div>
                       <ul className="space-y-2 text-sm text-muted-foreground">
