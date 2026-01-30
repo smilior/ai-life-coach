@@ -22,7 +22,7 @@ import {
 /**
  * OpenAIプロバイダーを取得（環境変数チェック付き）
  */
-function getOpenAIProvider() {
+export function getOpenAIProvider() {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {

@@ -26,13 +26,28 @@ function NewHabitForm() {
     router.refresh();
   };
 
+  const validCategories = ["health", "learning", "work", "life", "other"] as const;
+  const validFrequencies = ["daily", "weekdays", "weekends", "custom"] as const;
+
   const initialData: Partial<HabitFormData> = {};
   const name = searchParams.get("name");
   const description = searchParams.get("description");
   const twoMinuteVersion = searchParams.get("twoMinuteVersion");
+  const category = searchParams.get("category");
+  const trigger = searchParams.get("trigger");
+  const ifThenPlan = searchParams.get("ifThenPlan");
+  const frequency = searchParams.get("frequency");
   if (name) initialData.name = name;
   if (description) initialData.description = description;
   if (twoMinuteVersion) initialData.twoMinuteVersion = twoMinuteVersion;
+  if (category && (validCategories as readonly string[]).includes(category)) {
+    initialData.category = category as HabitFormData["category"];
+  }
+  if (trigger) initialData.trigger = trigger;
+  if (ifThenPlan) initialData.ifThenPlan = ifThenPlan;
+  if (frequency && (validFrequencies as readonly string[]).includes(frequency)) {
+    initialData.frequency = frequency as HabitFormData["frequency"];
+  }
 
   return (
     <div className="container mx-auto max-w-md px-4 py-6">

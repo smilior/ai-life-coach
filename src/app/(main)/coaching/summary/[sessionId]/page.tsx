@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,25 +16,13 @@ import {
   Sparkles,
   Home,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { SessionProgress } from "@/components/features/coaching";
 import type { CoachingStep } from "@/types/ai";
 
 /**
- * APIレスポンスのメッセージ型
- */
-interface ApiMessage {
-  id: string;
-  sessionId: string;
-  role: string;
-  content: string;
-  step: number | null;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-}
-
-/**
- * APIレスポンスのセッション詳細型
+ * APIレスポンスのセッション詳細型（基本情報のみ）
  */
 interface ApiSessionDetail {
   id: string;
@@ -42,30 +30,46 @@ interface ApiSessionDetail {
   sessionType: string;
   status: string;
   currentStep: number;
-  context: Record<string, unknown> | null;
-  summary: string | null;
   startedAt: string;
   completedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  messages: ApiMessage[];
+  messages: Array<{ id: string }>;
 }
 
 /**
- * サマリー表示用の型
+ * AI生成サマリーの習慣提案型
  */
-interface SessionSummary {
-  id: string;
+interface HabitSuggestion {
+  name: string;
+  description: string;
+  category: "health" | "learning" | "work" | "life" | "other";
+  twoMinuteVersion: string;
+  trigger: string;
+  ifThenPlan: string;
+  frequency: "daily" | "weekdays" | "weekends";
+}
+
+/**
+ * AI生成サマリーの型
+ */
+interface AISummary {
   theme: string;
-  date: string;
-  duration: string;
-  messageCount: number;
-  completedSteps: CoachingStep;
   goal: string;
   currentState: string;
   strengths: string[];
   actionItems: string[];
   coachMessage: string;
+  habitSuggestion: HabitSuggestion;
+}
+
+/**
+ * 表示用セッション基本情報
+ */
+interface SessionBasicInfo {
+  id: string;
+  date: string;
+  duration: string;
+  messageCount: number;
+  completedSteps: CoachingStep;
 }
 
 /**
@@ -93,119 +97,28 @@ function formatDateJa(dateStr: string): string {
 }
 
 /**
- * メッセージのmetadataから情報を抽出する
- */
-function extractFromMessages(messages: ApiMessage[]): {
-  strengths: string[];
-  actionItems: string[];
-  goal: string;
-  currentState: string;
-} {
-  const strengths: string[] = [];
-  const actionItems: string[] = [];
-  let goal = "";
-  let currentState = "";
-
-  for (const msg of messages) {
-    if (msg.metadata) {
-      if (Array.isArray(msg.metadata.strengths)) {
-        strengths.push(
-          ...(msg.metadata.strengths as string[]).filter(
-            (s) => !strengths.includes(s)
-          )
-        );
-      }
-      if (Array.isArray(msg.metadata.actionItems)) {
-        actionItems.push(
-          ...(msg.metadata.actionItems as string[]).filter(
-            (a) => !actionItems.includes(a)
-          )
-        );
-      }
-      if (typeof msg.metadata.goal === "string" && msg.metadata.goal) {
-        goal = msg.metadata.goal;
-      }
-      if (
-        typeof msg.metadata.currentState === "string" &&
-        msg.metadata.currentState
-      ) {
-        currentState = msg.metadata.currentState;
-      }
-    }
-  }
-
-  return { strengths, actionItems, goal, currentState };
-}
-
-/**
- * コーチからの最後のメッセージを取得する
- */
-function getLastCoachMessage(messages: ApiMessage[]): string {
-  const assistantMessages = messages.filter((m) => m.role === "assistant");
-  if (assistantMessages.length === 0) {
-    return "セッションにご参加いただきありがとうございました。引き続き目標に向けて頑張りましょう！";
-  }
-  return assistantMessages[assistantMessages.length - 1].content;
-}
-
-/**
- * APIレスポンスをサマリーに変換
- */
-function mapApiToSummary(apiSession: ApiSessionDetail): SessionSummary {
-  const extracted = extractFromMessages(apiSession.messages);
-
-  const completedSteps =
-    apiSession.currentStep >= 1 && apiSession.currentStep <= 9
-      ? (apiSession.currentStep as CoachingStep)
-      : (9 as CoachingStep);
-
-  return {
-    id: apiSession.id,
-    theme: apiSession.title,
-    date: formatDateJa(apiSession.startedAt),
-    duration: calculateDuration(apiSession.startedAt, apiSession.completedAt),
-    messageCount: apiSession.messages.length,
-    completedSteps,
-    goal:
-      extracted.goal ||
-      (apiSession.context?.goal as string) ||
-      "セッション内で目標を設定しました",
-    currentState:
-      extracted.currentState ||
-      (apiSession.context?.currentState as string) ||
-      "セッション内で現在地を確認しました",
-    strengths:
-      extracted.strengths.length > 0
-        ? extracted.strengths
-        : ["セッションを完了する意欲"],
-    actionItems:
-      extracted.actionItems.length > 0
-        ? extracted.actionItems
-        : ["セッションで得た気づきを振り返る"],
-    coachMessage:
-      apiSession.summary || getLastCoachMessage(apiSession.messages),
-  };
-}
-
-/**
  * セッションサマリー画面
  * - セッション完了後のまとめ
- * - 目標・現在地・次のステップ
- * - 「この目標を習慣に登録」ボタン
+ * - AIによる構造化サマリー生成
+ * - 「おすすめの習慣を登録」ボタン
  */
 export default function SessionSummaryPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params.sessionId as string;
 
-  const [summary, setSummary] = useState<SessionSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [basicInfo, setBasicInfo] = useState<SessionBasicInfo | null>(null);
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
+  const [isLoadingBasic, setIsLoadingBasic] = useState(true);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  // Stage 1: セッション基本情報取得
   useEffect(() => {
-    async function fetchSessionDetail() {
+    async function fetchBasicInfo() {
       try {
-        setIsLoading(true);
+        setIsLoadingBasic(true);
         setError(null);
         const response = await fetch(`/api/coaching/sessions/${sessionId}`);
         if (!response.ok) {
@@ -216,7 +129,18 @@ export default function SessionSummaryPage() {
         }
         const json = await response.json();
         if (json.success && json.data) {
-          setSummary(mapApiToSummary(json.data));
+          const data = json.data as ApiSessionDetail;
+          const completedSteps =
+            data.currentStep >= 1 && data.currentStep <= 9
+              ? (data.currentStep as CoachingStep)
+              : (9 as CoachingStep);
+          setBasicInfo({
+            id: data.id,
+            date: formatDateJa(data.startedAt),
+            duration: calculateDuration(data.startedAt, data.completedAt),
+            messageCount: data.messages.length,
+            completedSteps,
+          });
         } else {
           throw new Error("セッション情報の取得に失敗しました");
         }
@@ -228,31 +152,72 @@ export default function SessionSummaryPage() {
             : "セッション情報の取得に失敗しました"
         );
       } finally {
-        setIsLoading(false);
+        setIsLoadingBasic(false);
       }
     }
 
-    fetchSessionDetail();
+    fetchBasicInfo();
   }, [sessionId]);
 
-  // ローディング状態
-  if (isLoading) {
+  // Stage 2: AIサマリー生成
+  const fetchSummary = useCallback(async () => {
+    try {
+      setIsLoadingSummary(true);
+      setSummaryError(null);
+      const response = await fetch(
+        `/api/coaching/sessions/${sessionId}/summary`,
+        { method: "POST" }
+      );
+      if (!response.ok) {
+        throw new Error("サマリーの生成に失敗しました");
+      }
+      const json = await response.json();
+      if (json.success && json.data) {
+        setAiSummary(json.data as AISummary);
+      } else {
+        throw new Error("サマリーの生成に失敗しました");
+      }
+    } catch (err) {
+      console.error("Failed to generate summary:", err);
+      setSummaryError(
+        err instanceof Error
+          ? err.message
+          : "サマリーの生成に失敗しました"
+      );
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (basicInfo && !aiSummary && !summaryError) {
+      fetchSummary();
+    }
+  }, [basicInfo, aiSummary, summaryError, fetchSummary]);
+
+  // ヘッダーコンポーネント
+  const pageHeader = (
+    <header className="border-b bg-background">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 -ml-2"
+          onClick={() => router.push("/coaching")}
+          aria-label="戻る"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="font-semibold text-sm">セッション完了</h1>
+      </div>
+    </header>
+  );
+
+  // ローディング状態（基本情報取得中）
+  if (isLoadingBasic) {
     return (
       <div className="flex flex-col min-h-[calc(100dvh-5rem)]">
-        <header className="border-b bg-background">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0 -ml-2"
-              onClick={() => router.push("/coaching")}
-              aria-label="戻る"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="font-semibold text-sm">セッション完了</h1>
-          </div>
-        </header>
+        {pageHeader}
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           <span className="ml-2 text-sm text-muted-foreground">
@@ -263,24 +228,11 @@ export default function SessionSummaryPage() {
     );
   }
 
-  // エラー状態
-  if (error || !summary) {
+  // エラー状態（基本情報取得失敗）
+  if (error || !basicInfo) {
     return (
       <div className="flex flex-col min-h-[calc(100dvh-5rem)]">
-        <header className="border-b bg-background">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0 -ml-2"
-              onClick={() => router.push("/coaching")}
-              aria-label="戻る"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="font-semibold text-sm">セッション完了</h1>
-          </div>
-        </header>
+        {pageHeader}
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-sm border-destructive/50">
             <CardContent className="p-6 text-center">
@@ -310,23 +262,22 @@ export default function SessionSummaryPage() {
     );
   }
 
+  // 習慣登録リンクの生成
+  function buildHabitLink(habit: HabitSuggestion): string {
+    const p = new URLSearchParams();
+    p.set("name", habit.name);
+    p.set("description", habit.description);
+    p.set("category", habit.category);
+    p.set("twoMinuteVersion", habit.twoMinuteVersion);
+    p.set("trigger", habit.trigger);
+    p.set("ifThenPlan", habit.ifThenPlan);
+    p.set("frequency", habit.frequency);
+    return `/habits/new?${p.toString()}`;
+  }
+
   return (
     <div className="flex flex-col min-h-[calc(100dvh-5rem)]">
-      {/* ヘッダー */}
-      <header className="border-b bg-background">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0 -ml-2"
-            onClick={() => router.push("/coaching")}
-            aria-label="戻る"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="font-semibold text-sm">セッション完了</h1>
-        </div>
-      </header>
+      {pageHeader}
 
       {/* コンテンツ */}
       <div className="flex-1 overflow-y-auto">
@@ -344,134 +295,175 @@ export default function SessionSummaryPage() {
 
           {/* セッション情報 */}
           <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-            <span>{summary.date}</span>
+            <span>{basicInfo.date}</span>
             <Separator orientation="vertical" className="h-3" />
-            <span>{summary.duration}</span>
+            <span>{basicInfo.duration}</span>
             <Separator orientation="vertical" className="h-3" />
-            <span>{summary.messageCount} メッセージ</span>
+            <span>{basicInfo.messageCount} メッセージ</span>
           </div>
 
           {/* 進捗表示 */}
-          <SessionProgress currentStep={summary.completedSteps} />
+          <SessionProgress currentStep={basicInfo.completedSteps} />
 
-          {/* セッションまとめカード */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                セッションまとめ
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  テーマ
-                </p>
-                <p className="text-sm">{summary.theme}</p>
-              </div>
-              <Separator />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  設定した目標
-                </p>
-                <p className="text-sm">{summary.goal}</p>
-              </div>
-              <Separator />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  現在地
-                </p>
-                <p className="text-sm">{summary.currentState}</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* AI サマリー部分 */}
+          {isLoadingSummary && (
+            <Card className="border-primary/20">
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      AIがセッションを分析しています...
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      会話内容から目標・強み・習慣提案を生成中
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* 発見した強み */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-secondary" />
-                あなたの強み
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {summary.strengths.map((strength) => (
-                  <Badge key={strength} variant="secondary">
-                    {strength}
-                  </Badge>
-                ))}
+          {summaryError && (
+            <Card className="border-destructive/50">
+              <CardContent className="p-6 text-center">
+                <p className="text-sm text-destructive">{summaryError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={fetchSummary}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  再試行
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {aiSummary && (
+            <>
+              {/* セッションまとめカード */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Target className="h-4 w-4 text-primary" />
+                    セッションまとめ
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      テーマ
+                    </p>
+                    <p className="text-sm">{aiSummary.theme}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      設定した目標
+                    </p>
+                    <p className="text-sm">{aiSummary.goal}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      現在地
+                    </p>
+                    <p className="text-sm">{aiSummary.currentState}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 発見した強み */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-secondary" />
+                    あなたの強み
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {aiSummary.strengths.map((strength) => (
+                      <Badge key={strength} variant="secondary">
+                        {strength}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 次のステップ */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-success" />
+                    次のステップ
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {aiSummary.actionItems.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <span className="shrink-0 h-5 w-5 rounded-full bg-success/10 text-success text-xs flex items-center justify-center font-medium mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              {/* コーチからのメッセージ */}
+              <Card className="bg-primary/5 border-primary/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-primary" />
+                    コーチからのメッセージ
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm space-y-2">
+                    {aiSummary.coachMessage
+                      .split("\n\n")
+                      .map((paragraph, idx) => (
+                        <p key={idx}>{paragraph}</p>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* アクションボタン */}
+              <div className="space-y-2 pt-2 pb-4">
+                <Button asChild className="w-full" size="lg">
+                  <Link href={buildHabitLink(aiSummary.habitSuggestion)}>
+                    <Target className="h-4 w-4 mr-2" />
+                    おすすめの習慣を登録
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full" size="lg">
+                  <Link href="/dashboard">
+                    <Home className="h-4 w-4 mr-2" />
+                    ホームに戻る
+                  </Link>
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            </>
+          )}
 
-          {/* 次のステップ */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <ListChecks className="h-4 w-4 text-success" />
-                次のステップ
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {summary.actionItems.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm">
-                    <span className="shrink-0 h-5 w-5 rounded-full bg-success/10 text-success text-xs flex items-center justify-center font-medium mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-
-          {/* コーチからのメッセージ */}
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-primary" />
-                コーチからのメッセージ
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm space-y-2">
-                {summary.coachMessage.split("\n\n").map((paragraph, idx) => (
-                  <p key={idx}>{paragraph}</p>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* アクションボタン */}
-          <div className="space-y-2 pt-2 pb-4">
-            <Button asChild className="w-full" size="lg">
-              <Link
-                href={(() => {
-                  const params = new URLSearchParams();
-                  if (summary.goal) params.set("name", summary.goal);
-                  if (summary.actionItems.length > 0) {
-                    params.set("twoMinuteVersion", summary.actionItems[0]);
-                  }
-                  if (summary.currentState) {
-                    params.set("description", summary.currentState);
-                  }
-                  const qs = params.toString();
-                  return `/habits/new${qs ? `?${qs}` : ""}`;
-                })()}
-              >
-                <Target className="h-4 w-4 mr-2" />
-                この目標を習慣に登録
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full" size="lg">
-              <Link href="/dashboard">
-                <Home className="h-4 w-4 mr-2" />
-                ホームに戻る
-              </Link>
-            </Button>
-          </div>
+          {/* サマリーがまだない場合のホームボタン */}
+          {!aiSummary && !isLoadingSummary && !summaryError && (
+            <div className="space-y-2 pt-2 pb-4">
+              <Button asChild variant="outline" className="w-full" size="lg">
+                <Link href="/dashboard">
+                  <Home className="h-4 w-4 mr-2" />
+                  ホームに戻る
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
