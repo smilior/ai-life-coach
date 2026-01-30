@@ -6,18 +6,26 @@ import { MessageCircle, SmilePlus } from "lucide-react";
 import Link from "next/link";
 
 interface DailyCheckinProps {
-  hasCheckedIn?: boolean;
+  selectedMood?: string | null;
+  onMoodSelect?: (mood: string) => void;
 }
 
 const moodOptions = [
-  { emoji: "😊", label: "良い" },
-  { emoji: "😐", label: "普通" },
-  { emoji: "😔", label: "落ち込み" },
-  { emoji: "😤", label: "イライラ" },
-  { emoji: "😴", label: "疲れ" },
+  { emoji: "😊", label: "良い", value: "good" },
+  { emoji: "😐", label: "普通", value: "neutral" },
+  { emoji: "😔", label: "落ち込み", value: "down" },
+  { emoji: "😤", label: "イライラ", value: "irritated" },
+  { emoji: "😴", label: "疲れ", value: "tired" },
 ];
 
-export function DailyCheckin({ hasCheckedIn = false }: DailyCheckinProps) {
+export function DailyCheckin({
+  selectedMood = null,
+  onMoodSelect,
+}: DailyCheckinProps) {
+  const moodParam = selectedMood
+    ? `?mood=${encodeURIComponent(selectedMood)}`
+    : "";
+
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">デイリーチェックイン</h2>
@@ -30,19 +38,36 @@ export function DailyCheckin({ hasCheckedIn = false }: DailyCheckinProps) {
             <p className="text-sm font-medium">今日の気分は?</p>
           </div>
           <div className="flex justify-between gap-2">
-            {moodOptions.map((mood) => (
-              <button
-                key={mood.label}
-                type="button"
-                className="flex flex-1 flex-col items-center gap-1 rounded-lg p-2 transition-colors hover:bg-muted active:bg-muted/80"
-                aria-label={mood.label}
-              >
-                <span className="text-2xl">{mood.emoji}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {mood.label}
-                </span>
-              </button>
-            ))}
+            {moodOptions.map((mood) => {
+              const isSelected = selectedMood === mood.value;
+              return (
+                <button
+                  key={mood.label}
+                  type="button"
+                  className={`flex flex-1 flex-col items-center gap-1 rounded-lg p-2 transition-colors ${
+                    isSelected
+                      ? "bg-primary/10 ring-2 ring-primary/50"
+                      : "hover:bg-muted active:bg-muted/80"
+                  }`}
+                  aria-label={mood.label}
+                  aria-pressed={isSelected}
+                  onClick={() => onMoodSelect?.(mood.value)}
+                >
+                  <span className={`text-2xl ${isSelected ? "scale-110" : ""} transition-transform`}>
+                    {mood.emoji}
+                  </span>
+                  <span
+                    className={`text-[10px] ${
+                      isSelected
+                        ? "font-medium text-primary"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {mood.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -62,7 +87,7 @@ export function DailyCheckin({ hasCheckedIn = false }: DailyCheckinProps) {
                 </p>
               </div>
               <Button className="w-full" size="lg" asChild>
-                <Link href="/coaching">コーチングを始める</Link>
+                <Link href={`/coaching${moodParam}`}>コーチングを始める</Link>
               </Button>
             </div>
           </div>
