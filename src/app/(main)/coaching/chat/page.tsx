@@ -243,6 +243,13 @@ function CoachingChatContent() {
 
         // ストリーミング応答の処理
         const sessionEndHeader = res.headers.get("X-Session-End");
+        const nextStepHeader = res.headers.get("X-Next-Step");
+        if (nextStepHeader) {
+          const nextStep = parseInt(nextStepHeader, 10);
+          if (nextStep >= 1 && nextStep <= 9) {
+            setCurrentStep(nextStep as CoachingStep);
+          }
+        }
         const reader = res.body?.getReader();
         if (!reader) throw new Error("No response body");
 

@@ -68,3 +68,4 @@ public/workbox-*.js.map
 *.log
 *.cache
 .eslintcache
+.env*.local

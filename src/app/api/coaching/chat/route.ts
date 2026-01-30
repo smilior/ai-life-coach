@@ -157,7 +157,10 @@ export async function POST(request: NextRequest) {
     });
 
     // ステップの進行を判定
-    const totalMessages = existingMessages.length + 1; // +1 for current message
+    // +2: 現在のユーザーメッセージ + これから生成されるアシスタント応答
+    // existingMessages は常に偶数（user+assistant ペア）なので、+1 だと常に奇数になり
+    // messageCount % 4 === 0 が絶対に成立しないバグがあった
+    const totalMessages = existingMessages.length + 2;
     const nextStep = shouldAdvanceStep(
       currentStep,
       totalMessages,
@@ -219,6 +222,9 @@ export async function POST(request: NextRequest) {
 
       // Vercel AI SDK の toTextStreamResponse を使用
       const response = result.toTextStreamResponse();
+
+      // ステップ進行情報をヘッダーで通知
+      response.headers.set("X-Next-Step", String(nextStep));
 
       // セッション終了時はヘッダーを付与
       if (shouldEndSession) {
