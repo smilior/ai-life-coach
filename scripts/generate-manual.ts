@@ -113,7 +113,7 @@ async function addHighlights(page: Page, highlights: Highlight[]) {
         label.className = "__manual-highlight-box__";
         label.style.cssText = [
           "position: absolute",
-          `top: ${box.y + scroll.y - 30}px`,
+          `top: ${Math.max(0, box.y + scroll.y - 30)}px`,
           `left: ${box.x + scroll.x - 3}px`,
           `background: ${color}`,
           "color: white",
@@ -567,11 +567,12 @@ async function captureMainApp(
     "習慣一覧",
     "12-habits.png",
     [
-      "- ① **習慣リスト**: 登録した習慣が一覧表示されます。各習慣の達成状況が確認できます",
-      "- ② **新規作成**: 習慣がない場合は「コーチングで習慣を設定しましょう」のメッセージが表示されます",
+      "- ① **習慣管理**: 登録した習慣が一覧表示されます。各習慣の達成状況が確認できます",
+      "- ② **追加ボタン**: 新しい習慣を追加できます",
     ].join("\n"),
     [
-      { selector: "main, [class*='flex-1']", label: "① 習慣リスト" },
+      { selector: "h1", label: "① 習慣管理" },
+      { selector: 'a:has-text("追加"), button:has-text("追加")', label: "② 追加ボタン" },
     ]
   );
 
@@ -602,10 +603,12 @@ async function captureMainApp(
     "進捗ページ",
     "14-progress.png",
     [
-      "- ① **進捗サマリー**: 習慣の達成状況やストリーク（連続達成日数）を確認できます",
+      "- ① **進捗・統計**: 習慣の達成状況やストリーク（連続達成日数）を確認できます",
+      "- ② **KPIカード**: 達成率・完了回数・習慣数を一覧で確認できます",
     ].join("\n"),
     [
-      { selector: "main", label: "① 進捗サマリー" },
+      { selector: "h1", label: "① 進捗・統計" },
+      { selector: ".grid.grid-cols-3", label: "② KPIカード" },
     ]
   );
 
