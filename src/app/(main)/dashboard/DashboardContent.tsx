@@ -34,7 +34,6 @@ export function DashboardContent({ userName }: DashboardContentProps) {
   const [habits, setHabits] = useState<HabitApiData[]>([]);
   const [weekData, setWeekData] = useState<DayProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
 
   // データ取得
   useEffect(() => {
@@ -128,10 +127,7 @@ export function DashboardContent({ userName }: DashboardContentProps) {
       )}
 
       {/* 4. デイリーチェックインカード */}
-      <DailyCheckin
-        selectedMood={selectedMood}
-        onMoodSelect={setSelectedMood}
-      />
+      <DailyCheckin />
 
       {/* 5. 週間進捗サマリー */}
       <WeeklyProgress weekData={weekData} />
